@@ -12,28 +12,18 @@ import pandas as pd
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_PATH = BASE_DIR / "data" / "clean_master_dataset.csv"
 MODEL_PATH = BASE_DIR / "models" / "model.pkl"
-SHAP_PATH = BASE_DIR / "outputs" / "shap_importance.csv"
 FEATURE_COLS_PATH = BASE_DIR / "models" / "feature_cols.json"
 THRESHOLDS_PATH = BASE_DIR / "models" / "risk_thresholds.json"
 
-# ================= FEATURE NAME MAPPING =================
-FEATURE_NAME_MAP = {
-    "gdp_current_usd": "GDP (Current USD)",
-    "gdp_growth_pct": "GDP Growth",
-    "exports_pct_gdp": "Exports (% of GDP)",
-    "imports_pct_gdp": "Imports (% of GDP)",
-    "interest_rate_pct": "Interest Rates",
-    "interest_rate_pct_z": "Interest Rates (normalized)",
-    "unemployment_rate_pct": "Unemployment Rate",
-    "unemployment_rate_pct_lag1": "Short-term unemployment trend",
-    "exports_pct_gdp_lag1": "Short-term export trend",
-    "exports_pct_gdp_lag3": "Medium-term export trend",
-    "imports_pct_gdp_lag1": "Short-term import dependency",
-    "imports_pct_gdp_lag3": "Medium-term import dependency",
-}
-
+# ================= FEATURE NAME CLEANING =================
 def humanize_feature(feat: str) -> str:
-    return FEATURE_NAME_MAP.get(feat, feat.replace("_", " ").title())
+    feat = feat.replace("_pct", "")
+    feat = feat.replace("_usd", "")
+    feat = feat.replace("_lag1", " (Short-term)")
+    feat = feat.replace("_lag3", " (Medium-term)")
+    feat = feat.replace("_z", " (Normalized)")
+    feat = feat.replace("_", " ").title()
+    return feat
 
 # ================= LOADERS =================
 @lru_cache(maxsize=1)
@@ -61,18 +51,10 @@ def load_thresholds() -> dict:
 def load_explainer():
     return shap.TreeExplainer(load_model())
 
-# ✅ NEW (FIX)
-@lru_cache(maxsize=1)
-def load_shap():
-    if SHAP_PATH.exists():
-        return pd.read_csv(SHAP_PATH)
-    return pd.DataFrame()
-
 # ================= CORE =================
 def align_features(df: pd.DataFrame) -> pd.DataFrame:
     cols = load_feature_cols()
-    df_aligned = df.reindex(columns=cols, fill_value=0)
-    return df_aligned[cols]
+    return df.reindex(columns=cols, fill_value=0)[cols]
 
 def risk_label(prob: float) -> str:
     t = load_thresholds()
@@ -81,16 +63,6 @@ def risk_label(prob: float) -> str:
     elif prob < t["high"]:
         return "MEDIUM"
     return "HIGH"
-
-# ================= UI THEME (FIX) =================
-def apply_dark_theme(fig):
-    fig.update_layout(
-        template="plotly_dark",
-        paper_bgcolor="#0e1117",
-        plot_bgcolor="#0e1117",
-        font=dict(color="white"),
-    )
-    return fig
 
 # ================= PREDICTION =================
 def predict_with_explanations(df_row: pd.DataFrame):
@@ -118,11 +90,7 @@ def predict_with_explanations(df_row: pd.DataFrame):
 
     return prob, insights
 
-# ================= BUSINESS INSIGHTS =================
-def driver_to_business(feat: str, delta: float) -> str:
-    label = humanize_feature(feat)
-    return f"{label} is {'increasing' if delta > 0 else 'reducing'} financial risk"
-
+# ================= EXECUTIVE INSIGHTS =================
 def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
     if isinstance(shap_values, list):
         shap_values = shap_values[1]
@@ -130,8 +98,17 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
     shap_values = np.array(shap_values).flatten()
     feature_cols = list(aligned.columns)
 
-    order = np.argsort(np.abs(shap_values))[::-1][:3]
+    order = np.argsort(np.abs(shap_values))[::-1]
 
+    group_map = {
+        "gdp": "Economic Growth",
+        "interest": "Interest Rates",
+        "import": "Import Dependency",
+        "export": "Export Strength",
+        "unemployment": "Labor Market",
+    }
+
+    seen_groups = set()
     drivers = []
     actions = []
 
@@ -139,23 +116,36 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
         feat = feature_cols[idx]
         delta = shap_values[idx]
 
-        text = driver_to_business(feat, delta)
-        drivers.append(f"- {text}")
+        group = None
+        for k in group_map:
+            if k in feat:
+                group = group_map[k]
+                break
 
-        if "interest" in feat:
-            actions.append("Adjust monetary policy")
-        elif "export" in feat:
-            actions.append("Boost export performance")
-        elif "import" in feat:
-            actions.append("Reduce import dependency")
-        elif "gdp" in feat:
-            actions.append("Stimulate economic growth")
+        if group and group not in seen_groups:
+            direction = "increasing" if delta > 0 else "reducing"
+            drivers.append(f"- {group} is {direction} financial risk")
+            seen_groups.add(group)
 
-    actions = list(set(actions))
-    summary = drivers[0] if drivers else "Risk stable"
+            if group == "Interest Rates":
+                actions.append("Adjust monetary policy")
+            elif group == "Export Strength":
+                actions.append("Boost export performance")
+            elif group == "Import Dependency":
+                actions.append("Reduce import reliance")
+            elif group == "Economic Growth":
+                actions.append("Stimulate GDP growth")
+
+        if len(drivers) == 3:
+            break
+
+    if drivers:
+        summary = "Key risk is driven by " + drivers[0].replace("- ", "").lower()
+    else:
+        summary = "Risk remains stable"
 
     return {
         "summary": summary,
         "drivers": drivers,
-        "actions": actions,
+        "actions": list(set(actions)),
     }
