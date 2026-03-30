@@ -113,13 +113,18 @@ def main():
         # =========================
         # 🎯 SCENARIO SIMULATOR
         # =========================
-        st.markdown("### Scenario Simulator")
+st.markdown("### Scenario Simulator")
 
-        gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0, 0.5)
-        imp_delta = st.slider("Imports change (%)", -20.0, 20.0, 0.0, 0.5)
-        exp_delta = st.slider("Exports change (%)", -20.0, 20.0, 0.0, 0.5)
-        rate_delta = st.slider("Interest rate change (bps)", -300.0, 300.0, 0.0, 25.0)
-        infl_delta = st.slider("Inflation change (pp)", -5.0, 5.0, 0.0, 0.25)
+st.markdown("#### Economic Growth")
+gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0, 0.5)
+
+st.markdown("#### Trade Dynamics")
+imp_delta = st.slider("Imports change (%)", -20.0, 20.0, 0.0, 0.5)
+exp_delta = st.slider("Exports change (%)", -20.0, 20.0, 0.0, 0.5)
+
+st.markdown("#### Monetary Conditions")
+rate_delta = st.slider("Interest rate change (bps)", -300.0, 300.0, 0.0, 25.0)
+infl_delta = st.slider("Inflation change (pp)", -5.0, 5.0, 0.0, 0.25)
 
         sim_row = latest.copy()
 
@@ -144,6 +149,14 @@ def main():
         )
 
         st.write(f"Simulated Risk Level: **{risk_label(sim_prob)}**")
+change = sim_prob - prob
+
+if change > 0.02:
+    st.error("Risk is significantly increasing under this scenario")
+elif change < -0.02:
+    st.success("Risk is significantly decreasing under this scenario")
+else:
+    st.info("Scenario has limited impact on risk")
 
         st.markdown("**Simulated Top Drivers:**")
         for txt in sim_insights:
