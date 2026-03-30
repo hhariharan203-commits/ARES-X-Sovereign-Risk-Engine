@@ -5,7 +5,7 @@ import plotly.express as px
 import streamlit as st
 
 # ✅ FIXED IMPORT
-from app.utils import (
+from utils import (
     align_features,
     load_data,
     load_model,
