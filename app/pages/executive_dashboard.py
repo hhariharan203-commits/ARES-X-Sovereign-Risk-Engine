@@ -10,9 +10,21 @@ from utils import align_features, load_data, load_model, risk_label, load_explai
 
 def add_probabilities(df: pd.DataFrame, model) -> pd.DataFrame:
     aligned = align_features(df)
+
+    # ✅ Fix missing values
+    aligned = aligned.fillna(0)
+
+    # ✅ Fix feature mismatch
+    if hasattr(model, "feature_names_in_"):
+        aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
+
+    # ✅ Ensure numeric type
+    aligned = aligned.astype(float)
+
     df = df.copy()
     df["crisis_prob"] = model.predict_proba(aligned)[:, 1]
     df["risk_level"] = df["crisis_prob"].apply(risk_label)
+
     return df
 
 
