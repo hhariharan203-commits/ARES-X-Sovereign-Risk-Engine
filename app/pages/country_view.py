@@ -13,9 +13,12 @@ from utils import (
     risk_label,
     load_explainer,
     apply_dark_theme,
+    humanize_feature,
 )
 
-
+# =========================
+# PREPARE FEATURES
+# =========================
 def prepare_features(df, model):
     aligned = align_features(df)
     aligned = aligned.fillna(0)
@@ -23,10 +26,12 @@ def prepare_features(df, model):
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
 
-    aligned = aligned.astype(float)
-    return aligned
+    return aligned.astype(float)
 
 
+# =========================
+# MAIN APP
+# =========================
 def main():
     st.title("Country Intelligence")
 
@@ -44,11 +49,17 @@ def main():
     # =========================
     st.subheader(f"Economic Indicators — {country}")
 
+    # Human-friendly labels for chart
+    df_plot = df_country.rename(columns={
+        "gdp_current_usd": "GDP (USD)",
+        "exports_pct_gdp": "Exports (% GDP)",
+        "imports_pct_gdp": "Imports (% GDP)",
+    })
+
     fig = px.line(
-        df_country,
+        df_plot,
         x="month",
-        y=["gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"],
-        labels={"value": "Value", "variable": "Series"},
+        y=["GDP (USD)", "Exports (% GDP)", "Imports (% GDP)"],
         title=f"Economic Indicators — {country}",
     )
 
@@ -64,7 +75,6 @@ def main():
     if not df_country.empty:
         latest = df_country.sort_values("month").tail(1)
 
-        # Safe prediction
         prob, insights = predict_with_explanations(latest)
 
         st.metric("Crisis Probability", f"{prob:.2%}")
@@ -87,7 +97,8 @@ def main():
 
         shap_vals = np.array(shap_vals).flatten()
 
-        exec_insights = generate_executive_insights(aligned, shap_vals, 0.0)
+        # ✅ FIXED FUNCTION CALL
+        exec_insights = generate_executive_insights(aligned, shap_vals)
 
         st.write(exec_insights["summary"])
 
@@ -149,7 +160,8 @@ def main():
 
         sim_shap_vals = np.array(sim_shap_vals).flatten()
 
-        sim_exec = generate_executive_insights(sim_aligned, sim_shap_vals, 0.0)
+        # ✅ FIXED FUNCTION CALL
+        sim_exec = generate_executive_insights(sim_aligned, sim_shap_vals)
 
         st.markdown("**Simulated Executive Insights:**")
         st.write(sim_exec["summary"])
