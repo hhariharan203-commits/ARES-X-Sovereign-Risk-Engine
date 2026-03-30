@@ -15,6 +15,15 @@ It transforms raw economic indicators into actionable intelligence, enabling ana
 
 ---
 
+## 🎯 Business Impact
+
+- Identifies high-risk sovereign economies using macroeconomic indicators  
+- Provides early warning signals for financial instability  
+- Enables scenario-based decision making for policy and investment strategies  
+- Combines ML predictions with explainable AI for transparency
+
+---
+
 🚀 Key Features
 
 - Crisis Risk Prediction using Machine Learning (XGBoost)
