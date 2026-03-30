@@ -172,19 +172,19 @@ ARES-X/
 ## 📸 Screenshots
 
 ### Executive Dashboard
-![Executive Dashboard](screenshots/executive_dashboard.png)
+<img src="screenshots/executive_dashboard.png" width="800"/>
 
 ### Global Risk Heatmap
-![Heatmap](screenshots/global_heatmap.png)
+<img src="screenshots/global_heatmap.png" width="800"/>
 
 ### Forecast Results
-![Forecast](screenshots/forecast_result.png)
+<img src="screenshots/forecast_result.png" width="800"/>
 
 ### Scenario Simulation
-![Scenario](screenshots/scenario_simulation.png)
+<img src="screenshots/scenario_simulation.png" width="800"/>
 
 ### Explainability (SHAP)
-![SHAP](screenshots/shap_explainability.png)
+<img src="screenshots/shap_explainability.png" width="800"/>
 
 ---
 
