@@ -2,6 +2,13 @@ from __future__ import annotations
 
 import streamlit as st
 
+# ✅ MUST BE FIRST STREAMLIT COMMAND
+st.set_page_config(
+    page_title="ARES-X Control Center",
+    layout="wide"
+)
+
+# ✅ Now safe to use other Streamlit commands
 st.markdown(
     """
 <style>
@@ -19,8 +26,8 @@ h1, h2, h3 {
 
 
 def main():
-    st.set_page_config(page_title="ARES-X Control Center", layout="wide")
     st.title("ARES-X Control Center")
+
     st.markdown(
         """
         Welcome to the ARES-X multi-page dashboard. Use the sidebar to navigate between:
@@ -30,7 +37,9 @@ def main():
         - **Forecast** for forward-looking crisis risk
         """
     )
+
     st.markdown("---")
+
     st.caption("Data: World Bank API | Countries: 24 | Period: 2000–2024")
 
 
