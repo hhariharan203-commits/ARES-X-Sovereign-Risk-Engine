@@ -169,14 +169,22 @@ ARES-X/
 
 ---
 
-📸 Screenshots
+## 📸 Screenshots
 
-Add:
+### Executive Dashboard
+![Executive Dashboard](screenshots/executive_dashboard.png)
 
-- Global Heatmap
-- Forecast Dashboard
-- SHAP Insights
-- Executive Dashboard
+### Global Risk Heatmap
+![Heatmap](screenshots/global_heatmap.png)
+
+### Forecast Results
+![Forecast](screenshots/forecast_result.png)
+
+### Scenario Simulation
+![Scenario](screenshots/scenario_simulation.png)
+
+### Explainability (SHAP)
+![SHAP](screenshots/shap_explainability.png)
 
 ---
 
