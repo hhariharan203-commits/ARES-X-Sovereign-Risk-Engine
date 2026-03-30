@@ -39,8 +39,7 @@ def humanize_feature(feat: str) -> str:
 @lru_cache(maxsize=1)
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH, parse_dates=["month"])
-    df = df.sort_values(["country", "month"]).reset_index(drop=True)
-    return df
+    return df.sort_values(["country", "month"]).reset_index(drop=True)
 
 @lru_cache(maxsize=1)
 def load_model():
@@ -62,6 +61,13 @@ def load_thresholds() -> dict:
 def load_explainer():
     return shap.TreeExplainer(load_model())
 
+# ✅ NEW (FIX)
+@lru_cache(maxsize=1)
+def load_shap():
+    if SHAP_PATH.exists():
+        return pd.read_csv(SHAP_PATH)
+    return pd.DataFrame()
+
 # ================= CORE =================
 def align_features(df: pd.DataFrame) -> pd.DataFrame:
     cols = load_feature_cols()
@@ -75,6 +81,16 @@ def risk_label(prob: float) -> str:
     elif prob < t["high"]:
         return "MEDIUM"
     return "HIGH"
+
+# ================= UI THEME (FIX) =================
+def apply_dark_theme(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#0e1117",
+        font=dict(color="white"),
+    )
+    return fig
 
 # ================= PREDICTION =================
 def predict_with_explanations(df_row: pd.DataFrame):
@@ -105,11 +121,7 @@ def predict_with_explanations(df_row: pd.DataFrame):
 # ================= BUSINESS INSIGHTS =================
 def driver_to_business(feat: str, delta: float) -> str:
     label = humanize_feature(feat)
-
-    if delta > 0:
-        return f"{label} is increasing financial risk"
-    else:
-        return f"{label} is reducing financial risk"
+    return f"{label} is {'increasing' if delta > 0 else 'reducing'} financial risk"
 
 def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
     if isinstance(shap_values, list):
@@ -131,17 +143,15 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
         drivers.append(f"- {text}")
 
         if "interest" in feat:
-            actions.append("Adjust monetary policy to stabilize rates")
+            actions.append("Adjust monetary policy")
         elif "export" in feat:
-            actions.append("Strengthen export performance")
+            actions.append("Boost export performance")
         elif "import" in feat:
-            actions.append("Control import dependency")
+            actions.append("Reduce import dependency")
         elif "gdp" in feat:
             actions.append("Stimulate economic growth")
 
-    # remove duplicates
     actions = list(set(actions))
-
     summary = drivers[0] if drivers else "Risk stable"
 
     return {
