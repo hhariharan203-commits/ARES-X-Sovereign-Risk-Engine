@@ -1,72 +1,29 @@
 ARES-X: Sovereign Crisis Intelligence Engine
 
+🔗 Live Demo:
+https://ares-x-sovereign-risk-engine-cakd8wraujxlh4dwws3gp7.streamlit.app/
+
+💡 No setup required — runs directly in browser
+
+---
+
+📌 Overview
+
 ARES-X is an end-to-end AI system that predicts sovereign financial crisis risk using macroeconomic data, machine learning, and explainable AI.
 
-It converts raw economic indicators into actionable intelligence, enabling analysts and decision-makers to monitor risk, simulate scenarios, and understand key economic drivers.
+It transforms raw economic indicators into actionable intelligence, enabling analysts, investors, and policymakers to monitor risk, simulate scenarios, and understand key economic drivers.
 
 ---
 
-🚀 Features
+🚀 Key Features
 
-- Crisis Risk Prediction (ML Model)
-- Global Risk Heatmap (Interactive Map)
+- Crisis Risk Prediction using Machine Learning (XGBoost)
+- Global Risk Heatmap (Interactive Choropleth)
 - Country-Level Intelligence Dashboard
-- Forecasting Engine with Trend Simulation
-- Explainable AI (SHAP-based Drivers)
-- Executive Insights + Suggested Actions
+- Forecasting Engine with Scenario Simulation
+- Explainable AI using SHAP
+- Executive Insights with Suggested Actions
 - End-to-End Data Pipeline (Automated)
-
----
-
-📁 Project Structure
-
-ARES-X/
-│
-├── app/
-│   ├── app.py
-│   ├── utils.py
-│   └── pages/
-│       ├── country_view.py
-│       ├── executive_dashboard.py
-│       ├── explainability.py
-│       ├── forecast.py
-│       ├── global_view.py
-│       └── model_performance.py
-│
-├── data/
-│   ├── world_bank_data.csv
-│   ├── google_trends.csv
-│   ├── news_sentiment.csv
-│   ├── fred_yield.csv
-│   ├── master_dataset.csv
-│   ├── clean_master_dataset.csv
-│   └── feature_importance.csv
-│
-├── models/
-│   ├── model.pkl
-│   ├── feature_cols.json
-│   ├── feature_cols.json (backup)
-│   └── risk_thresholds.json
-│
-├── outputs/
-│   ├── model_metrics.json
-│   ├── shap_summary.png
-│   ├── shap_bar.png
-│   └── shap_importance.csv
-│
-├── src/
-│   ├── fetch_world_bank.py
-│   ├── fetch_google_trends.py
-│   ├── fetch_gdelt_news.py
-│   ├── fetch_fred_yield.py
-│   ├── merge_datasets.py
-│   ├── clean_master_dataset.py
-│   ├── train_model.py
-│   ├── shap_explain.py
-│   └── validate_master.py
-│
-├── README.md
-└── requirements.txt
 
 ---
 
@@ -79,26 +36,26 @@ Recall| 0.705
 F1 Score| 0.568
 ROC-AUC| 0.780
 
-Insight:
+Interpretation
 
-- High recall → captures most crisis events
-- Strong ROC-AUC → reliable risk ranking
-- Suitable for early warning systems
+- High recall ensures crisis signals are captured early
+- Strong ROC-AUC indicates reliable risk ranking
+- Designed for early warning systems, not exact prediction
 
 ---
 
 📊 Data Sources
 
-ARES-X integrates multiple macroeconomic and alternative datasets:
+ARES-X integrates multiple datasets:
 
-- World Bank (GDP, inflation, trade)
-- Google Trends (market sentiment proxy)
-- GDELT News (global sentiment signals)
-- FRED Yield Data (interest rate proxy)
+- World Bank → GDP, inflation, trade
+- Google Trends → Market sentiment proxy
+- GDELT News → Global sentiment signals
+- FRED → Interest rate / yield data
 
 ---
 
-⚙️ Data Pipeline (src/)
+⚙️ Data Pipeline
 
 Run scripts in sequence:
 
@@ -136,9 +93,7 @@ Outputs:
 
 ---
 
-📊 Dashboard (Streamlit App)
-
-Run:
+📊 Dashboard (Streamlit)
 
 streamlit run app/app.py
 
@@ -152,15 +107,16 @@ streamlit run app/app.py
 - Trend analysis
 - High-risk countries
 
-2. Country View
+2. Country Intelligence
 
-- Country-specific indicators
+- Country-level indicators
 - Crisis probability tracking
+- Scenario simulation
 
 3. Global View
 
-- Risk heatmap across countries
-- Comparative analysis
+- Risk heatmap
+- Cross-country comparison
 
 4. Forecast
 
@@ -171,7 +127,7 @@ streamlit run app/app.py
 5. Explainability
 
 - SHAP feature importance
-- Top drivers of risk
+- Key risk drivers
 
 6. Model Performance
 
@@ -182,10 +138,11 @@ streamlit run app/app.py
 🧠 Explainable AI Logic
 
 - SHAP values processed safely
-- Top drivers extracted using absolute contribution
+- Top drivers selected using absolute contribution
 - Human-readable insights generated:
-  - ↑ increases risk
-  - ↓ decreases risk
+
+↑ increases risk  
+↓ decreases risk  
 
 ---
 
@@ -199,56 +156,53 @@ streamlit run app/app.py
 
 ---
 
-🔗 Live Demo
-https://ares-x-sovereign-risk-engine-cakd8wraujxlh4dwws3gp7.streamlit.app/
+📁 Project Structure
 
----
-
-🚀 Key Strengths
-
-- Full ML pipeline (data → model → dashboard)
-- Multi-source data integration
-- Explainable AI (SHAP)
-- Forecast + simulation capability
-- Modular, production-style architecture
-
----
-
-🔮 Future Improvements
-
-- Add real-time API ingestion
-- Expand to 100+ countries
-- Add deep learning models (LSTM)
-- Integrate geopolitical risk signals
-- Deploy as SaaS / API service
-
----
-
-▶️ Installation
-
-pip install -r requirements.txt
+ARES-X/
+├── app/
+├── data/
+├── models/
+├── outputs/
+├── src/
+├── README.md
+└── requirements.txt
 
 ---
 
 📸 Screenshots
 
-Add images of:
+Add:
 
 - Global Heatmap
-- Forecast Chart
+- Forecast Dashboard
 - SHAP Insights
 - Executive Dashboard
+
+---
+
+🔧 Installation
+
+pip install -r requirements.txt
+
+---
+
+🔒 Limitations
+
+- Covers 24 countries (expandable)
+- Macro data includes time-lag effects
+- Designed for directional risk, not exact prediction
 
 ---
 
 👤 Author
 
 Hariharan
-MBA - Finance
-Data Analyst 
+MBA – Finance & Business Analytics
+Data Analyst | AI & Financial Analytics
 
 ---
 
 ⭐ Final Note
 
-ARES-X is not just a model — it is a decision intelligence system that bridges machine learning and macroeconomic strategy.
+ARES-X is not just a model —
+it is a decision intelligence system that combines machine learning, macroeconomics, and explainability to support real-world strategic decisions.
