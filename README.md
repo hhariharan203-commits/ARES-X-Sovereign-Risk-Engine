@@ -51,6 +51,8 @@ Interpretation
 - Strong ROC-AUC indicates reliable risk ranking
 - Designed for early warning systems, not exact prediction
 
+Crisis events are rare, so the model prioritizes recall to capture early warning signals.
+
 ---
 
 📊 Data Sources
