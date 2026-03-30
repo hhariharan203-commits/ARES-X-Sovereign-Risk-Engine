@@ -25,7 +25,16 @@ def compute_alerts(df: pd.DataFrame, model):
         if tail.empty:
             continue
         aligned = align_features(tail)
-        probs = model.predict_proba(aligned)[:, 1]
+
+# FIX: clean + align data before prediction
+aligned = aligned.fillna(0)
+
+if hasattr(model, "feature_names_in_"):
+    aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
+
+aligned = aligned.astype(float)
+
+probs = model.predict_proba(aligned)[:, 1]
         if len(probs) == 1:
             latest_prob, prev_prob = probs[0], None
         else:
