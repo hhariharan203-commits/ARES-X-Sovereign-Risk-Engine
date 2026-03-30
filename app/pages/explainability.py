@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 
 # ✅ FIXED IMPORT
-from app.utils import load_shap, humanize_feature, apply_dark_theme
+from utils import load_shap, humanize_feature, apply_dark_theme
 
 
 def main():
