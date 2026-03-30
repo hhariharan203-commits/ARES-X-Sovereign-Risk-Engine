@@ -149,3 +149,24 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
         "drivers": drivers,
         "actions": list(set(actions)),
     }
+    
+# ================= UI HELPERS =================
+def apply_dark_theme(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#0e1117",
+        font=dict(color="white"),
+    )
+    return fig
+
+
+# ================= SHAP LOADER =================
+@lru_cache(maxsize=1)
+def load_shap():
+    shap_path = BASE_DIR / "outputs" / "shap_importance.csv"
+    
+    if shap_path.exists():
+        return pd.read_csv(shap_path)
+    
+    return pd.DataFrame()
