@@ -199,6 +199,11 @@ streamlit run app/app.py
 
 ---
 
+🔗 Live Demo
+https://ares-x-sovereign-risk-engine-cakd8wraujxlh4dwws3gp7.streamlit.app/
+
+---
+
 🚀 Key Strengths
 
 - Full ML pipeline (data → model → dashboard)
