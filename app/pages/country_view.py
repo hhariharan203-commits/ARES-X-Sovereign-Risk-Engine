@@ -1,14 +1,8 @@
-from __future__ import annotations
-
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import numpy as np
 import pandas as pd
 import streamlit as st
 
-from utils import (
+from app.utils import (
     load_data,
     load_model,
     add_probabilities,
