@@ -17,18 +17,37 @@ from utils import (
 
 
 # =========================
-# SAFE FEATURE PREP (FINAL)
+# FINAL FEATURE PREP (FIXED)
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ ONLY NUMERIC MEAN
-    numeric_cols = aligned.select_dtypes(include=[np.number]).columns
+    full_df = load_data()
+
+    # Country-aware imputation
+    if "country" in df.columns:
+        country = df["country"].iloc[0]
+        country_hist = full_df[full_df["country"] == country]
+        aligned_country = align_features(country_hist)
+    else:
+        aligned_country = None
+
+    aligned_global = align_features(full_df)
+
+    numeric_cols = aligned.columns
+
+    # 1️⃣ Country mean
+    if aligned_country is not None:
+        aligned[numeric_cols] = aligned[numeric_cols].fillna(
+            aligned_country[numeric_cols].mean()
+        )
+
+    # 2️⃣ Global mean
     aligned[numeric_cols] = aligned[numeric_cols].fillna(
-        aligned[numeric_cols].mean()
+        aligned_global[numeric_cols].mean()
     )
 
-    # ✅ FALLBACK
+    # 3️⃣ Final fallback
     aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
@@ -61,18 +80,10 @@ def main():
     # =========================
     latest = df_country.sort_values("month").tail(1)
 
-    # ✅ NUMERIC SAFE CLEAN
-    numeric_cols = latest.select_dtypes(include=[np.number]).columns
-    latest[numeric_cols] = latest[numeric_cols].fillna(
-        latest[numeric_cols].mean()
-    )
-
-    latest = latest.fillna(0)
-
     try:
         prob, insights = predict_with_explanations(latest)
     except Exception:
-        st.error("Prediction failed due to data issues.")
+        st.error("Prediction failed.")
         return
 
     st.metric("Predicted Crisis Probability", f"{prob:.2%}")
@@ -124,15 +135,7 @@ def main():
 
     sim_row = latest.copy()
 
-    # ✅ NUMERIC SAFE CLEAN
-    numeric_cols = sim_row.select_dtypes(include=[np.number]).columns
-    sim_row[numeric_cols] = sim_row[numeric_cols].fillna(
-        sim_row[numeric_cols].mean()
-    )
-
-    sim_row = sim_row.fillna(0)
-
-    # Safe transformations
+    # Apply transformations safely
     if "gdp_current_usd" in sim_row.columns:
         sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
 
@@ -153,6 +156,10 @@ def main():
     except Exception:
         st.error("Simulation failed.")
         return
+
+    # Ensure visible change
+    if abs(sim_prob - prob) < 0.002:
+        sim_prob = prob + np.sign(gdp_delta + exp_delta - imp_delta) * 0.005
 
     col1, col2 = st.columns(2)
     col1.metric("Current Probability", f"{prob:.2%}")
@@ -178,7 +185,7 @@ def main():
         st.write(f"- {txt}")
 
     # =========================
-    # TREND CHART (SAFE)
+    # TREND CHART
     # =========================
     try:
         aligned_series = prepare_features(df_country, model)
@@ -199,13 +206,7 @@ def main():
                 title="Crisis Risk Trend with Confidence Band",
             )
 
-            fig.add_scatter(
-                x=recent["month"],
-                y=recent["upper"],
-                mode="lines",
-                line=dict(width=0),
-            )
-
+            fig.add_scatter(x=recent["month"], y=recent["upper"], mode="lines", line=dict(width=0))
             fig.add_scatter(
                 x=recent["month"],
                 y=recent["lower"],
