@@ -1,9 +1,3 @@
-from __future__ import annotations
-
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import os
 import pandas as pd
 import plotly.express as px
@@ -11,7 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
-from utils import safe_metric
+from app.utils import safe_metric
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 METRICS_PATH = os.path.join(BASE_DIR, "data", "model_metrics.csv")
