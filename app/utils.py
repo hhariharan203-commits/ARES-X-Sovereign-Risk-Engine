@@ -220,3 +220,27 @@ def generate_executive_insights(aligned, shap_values):
             "drivers": ["No strong signals"],
             "actions": ["Maintain monitoring"],
         }
+# ================= EXTRA FUNCTIONS =================
+
+def load_shap():
+    try:
+        path = BASE_DIR / "data" / "shap_importance.csv"
+        df = pd.read_csv(path)
+        df.columns = df.columns.str.strip().str.lower()
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def apply_dark_theme(fig):
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="#0e1117",
+        plot_bgcolor="#0e1117",
+        font=dict(color="white"),
+    )
+    return fig
+
+
+def risk_label(prob):
+    return assign_risk(prob)
