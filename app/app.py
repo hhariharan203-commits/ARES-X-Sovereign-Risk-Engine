@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+# IMPORTANT: absolute import
+from app.utils import load_data, load_model
+
+
 # =========================
 # PAGE CONFIG (MUST BE FIRST)
 # =========================
@@ -29,9 +33,6 @@ h1, h2, h3, h4 {
 
 
 def main():
-    # =========================
-    # HEADER
-    # =========================
     st.title("ARES-X Control Center")
 
     st.markdown(
@@ -46,13 +47,46 @@ to deliver early warning signals for financial crises across global economies.
     st.markdown("---")
 
     # =========================
-    # KEY HIGHLIGHTS (NEW 🔥)
+    # LOAD DATA SAFELY
     # =========================
-    col1, col2, col3 = st.columns(3)
+    try:
+        df = load_data()
+        data_ok = not df.empty
+    except Exception:
+        df = None
+        data_ok = False
 
-    col1.metric("Countries Covered", "24+")
-    col2.metric("Time Period", "2000–2024")
-    col3.metric("Model Type", "XGBoost + SHAP")
+    try:
+        model = load_model()
+        model_ok = True
+    except Exception:
+        model_ok = False
+
+    # =========================
+    # DYNAMIC METRICS
+    # =========================
+    col1, col2, col3, col4 = st.columns(4)
+
+    if data_ok:
+        countries = df["country"].nunique() if "country" in df.columns else 0
+
+        if "month" in df.columns:
+            years = (
+                f"{df['month'].dt.year.min()} – {df['month'].dt.year.max()}"
+                if not df["month"].isna().all()
+                else "N/A"
+            )
+        else:
+            years = "N/A"
+
+    else:
+        countries = "N/A"
+        years = "N/A"
+
+    col1.metric("Countries Covered", countries)
+    col2.metric("Time Period", years)
+    col3.metric("Model Status", "Loaded" if model_ok else "Missing")
+    col4.metric("System Status", "Operational" if (data_ok and model_ok) else "Partial")
 
     st.markdown("---")
 
@@ -74,7 +108,7 @@ to deliver early warning signals for financial crises across global economies.
     st.markdown("---")
 
     # =========================
-    # BUSINESS VALUE (VERY IMPORTANT)
+    # BUSINESS VALUE
     # =========================
     st.subheader("Business Impact")
 
@@ -86,6 +120,21 @@ to deliver early warning signals for financial crises across global economies.
 - Combine machine learning with explainable AI for transparency  
 """
     )
+
+    st.markdown("---")
+
+    # =========================
+    # SYSTEM HEALTH (NEW 🔥)
+    # =========================
+    st.subheader("System Health")
+
+    if not data_ok:
+        st.warning("⚠️ Dataset not loaded correctly")
+    if not model_ok:
+        st.warning("⚠️ Model not loaded")
+
+    if data_ok and model_ok:
+        st.success("✅ All systems operational")
 
     st.markdown("---")
 
