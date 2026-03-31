@@ -5,13 +5,14 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import (
+from app.utils import (
     load_data,
     load_model,
     align_features,
     apply_dark_theme,
     risk_label,
 )
+
 
 # =========================
 # FEATURE PREP
@@ -26,27 +27,38 @@ def prepare_features(df, model):
 
 
 # =========================
-# SIMPLE FORECAST ENGINE
+# IMPROVED FORECAST ENGINE
 # =========================
 def generate_forecast(df_country, model, steps=3):
     df_country = df_country.sort_values("month").copy()
 
-    latest = df_country.tail(1).copy()
+    # Use last 3 periods for trend
+    recent = df_country.tail(3).copy()
+
+    latest = recent.tail(1).copy()
     forecasts = []
 
     current = latest.copy()
 
     for i in range(steps):
-        # simple forward simulation (trend continuation)
+        # 🔥 TREND-BASED CHANGE (NOT RANDOM)
         for col in current.columns:
-            if current[col].dtype != "object" and col not in ["month"]:
-                current[col] = current[col] * (1 + np.random.uniform(-0.02, 0.02))
+            if col not in ["month", "country"] and np.issubdtype(current[col].dtype, np.number):
+
+                if col in recent.columns:
+                    trend = recent[col].pct_change().mean()
+                    trend = 0 if pd.isna(trend) else trend
+
+                    # dampen to avoid explosion
+                    trend = np.clip(trend, -0.05, 0.05)
+
+                    current[col] = current[col] * (1 + trend)
 
         aligned = prepare_features(current, model)
         prob = float(model.predict_proba(aligned)[0, 1])
 
         forecasts.append({
-            "month": latest["month"].values[0] + pd.DateOffset(months=i+1),
+            "month": latest["month"].values[0] + pd.DateOffset(months=i + 1),
             "prediction": prob
         })
 
@@ -70,6 +82,10 @@ def main():
 
         model = load_model()
 
+        if "country" not in df.columns:
+            st.error("Country column missing")
+            return
+
         countries = sorted(df["country"].dropna().unique())
         country = st.selectbox("Select Country", countries)
 
@@ -80,28 +96,45 @@ def main():
             return
 
         # =========================
-        # CURRENT PROBABILITY
+        # CURRENT
         # =========================
         latest = df_country.sort_values("month").tail(1)
 
         aligned = prepare_features(latest, model)
         current_prob = float(model.predict_proba(aligned)[0, 1])
 
-        st.metric("Current Risk", f"{current_prob:.2%}")
-        st.write(f"Risk Level: **{risk_label(current_prob)}**")
+        col1, col2 = st.columns(2)
+        col1.metric("Current Risk", f"{current_prob:.2%}")
+        col2.metric("Risk Level", risk_label(current_prob))
+
+        # =========================
+        # HISTORICAL
+        # =========================
+        hist = df_country.sort_values("month").copy()
+        hist["prediction"] = model.predict_proba(
+            prepare_features(hist, model)
+        )[:, 1]
 
         # =========================
         # FORECAST
         # =========================
         forecast_df = generate_forecast(df_country, model)
 
-        # combine
-        hist = df_country.sort_values("month")[["month"]].copy()
-        hist["prediction"] = model.predict_proba(
-            prepare_features(df_country, model)
-        )[:, 1]
+        # =========================
+        # COMBINE
+        # =========================
+        hist_recent = hist.tail(12)
 
-        combined = pd.concat([hist.tail(12), forecast_df])
+        combined = pd.concat([
+            hist_recent.assign(type="Historical"),
+            forecast_df.assign(type="Forecast")
+        ])
+
+        # =========================
+        # CONFIDENCE BAND
+        # =========================
+        combined["upper"] = (combined["prediction"] + 0.05).clip(0, 1)
+        combined["lower"] = (combined["prediction"] - 0.05).clip(0, 1)
 
         # =========================
         # CHART
@@ -110,29 +143,55 @@ def main():
             combined,
             x="month",
             y="prediction",
+            color="type",
             title=f"{country} Risk Forecast",
         )
 
-        fig = apply_dark_theme(fig)
+        # confidence band
+        fig.add_scatter(
+            x=combined["month"],
+            y=combined["upper"],
+            mode="lines",
+            line=dict(width=0),
+            showlegend=False,
+        )
+
+        fig.add_scatter(
+            x=combined["month"],
+            y=combined["lower"],
+            mode="lines",
+            fill="tonexty",
+            line=dict(width=0),
+            fillcolor="rgba(255,0,0,0.1)",
+            showlegend=False,
+        )
+
         fig.update_layout(yaxis_tickformat=".0%")
+        fig = apply_dark_theme(fig)
 
         st.plotly_chart(fig, use_container_width=True)
 
         # =========================
-        # TABLE
+        # FORECAST TABLE
         # =========================
         st.subheader("Forecast Data")
         st.dataframe(forecast_df, use_container_width=True)
 
         # =========================
-        # INTERPRETATION
+        # EXECUTIVE INTERPRETATION
         # =========================
         change = forecast_df["prediction"].iloc[-1] - current_prob
 
-        if change > 0.02:
-            st.error("Risk expected to increase in coming months")
-        elif change < -0.02:
-            st.success("Risk expected to decrease")
+        st.subheader("Outlook")
+
+        if change > 0.03:
+            st.error("Risk expected to rise significantly — potential instability ahead")
+        elif change > 0.01:
+            st.warning("Risk trending upward — monitor closely")
+        elif change < -0.03:
+            st.success("Risk expected to decline — improving conditions")
+        elif change < -0.01:
+            st.info("Moderate improvement expected")
         else:
             st.info("Risk expected to remain stable")
 
