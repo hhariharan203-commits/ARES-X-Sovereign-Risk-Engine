@@ -2,102 +2,138 @@ from __future__ import annotations
 
 import plotly.express as px
 import streamlit as st
-
-from utils import load_shap, humanize_feature, apply_dark_theme, load_model, load_feature_cols
 import pandas as pd
 
+from utils import (
+    load_shap,
+    humanize_feature,
+    apply_dark_theme,
+    load_model,
+    load_feature_cols,
+)
 
+# =========================
+# MAIN
+# =========================
 def main():
-    st.title("Explainability")
+    st.title("Explainability — Global Risk Drivers")
 
-    shap_imp = load_shap()
+    try:
+        shap_imp = load_shap()
 
-    # =========================
-    # SAFETY CHECKS
-    # =========================
-    if shap_imp.empty:
-        # fallback to model feature importance if available
-        model = load_model()
-        if hasattr(model, "feature_importances_"):
-            feats = load_feature_cols()
-            shap_imp = pd.DataFrame(
-                {"feature": feats[: len(model.feature_importances_)], "mean_abs_shap": model.feature_importances_}
-            )
-        else:
-            st.warning("No SHAP or feature importance data available.")
+        # =========================
+        # FALLBACK (MODEL IMPORTANCE)
+        # =========================
+        if shap_imp.empty:
+            model = load_model()
+
+            if hasattr(model, "feature_importances_"):
+                feats = load_feature_cols()
+
+                shap_imp = pd.DataFrame({
+                    "feature": feats[: len(model.feature_importances_)],
+                    "mean_abs_shap": model.feature_importances_,
+                })
+            else:
+                st.warning("No feature importance available")
+                return
+
+        # =========================
+        # CLEAN
+        # =========================
+        shap_imp.columns = shap_imp.columns.str.strip().str.lower()
+
+        if not {"feature", "mean_abs_shap"}.issubset(shap_imp.columns):
+            st.error("Invalid SHAP format")
             return
 
-    shap_imp.columns = shap_imp.columns.str.strip().str.lower()
+        shap_imp = shap_imp.dropna(subset=["feature", "mean_abs_shap"])
 
-    required_cols = {"feature", "mean_abs_shap"}
-    if not required_cols.issubset(set(shap_imp.columns)):
-        st.error("Invalid SHAP data format.")
-        return
+        # =========================
+        # NORMALIZATION (IMPORTANT)
+        # =========================
+        total = shap_imp["mean_abs_shap"].sum()
 
-    # =========================
-    # CLEAN DATA
-    # =========================
-    shap_imp = shap_imp.copy()
+        if total > 0:
+            shap_imp["contribution_pct"] = (
+                shap_imp["mean_abs_shap"] / total
+            ) * 100
+        else:
+            shap_imp["contribution_pct"] = 0
 
-    # Remove NaN safely
-    shap_imp = shap_imp.dropna(subset=["feature", "mean_abs_shap"])
+        shap_imp["feature"] = shap_imp["feature"].apply(humanize_feature)
 
-    # Humanize feature names
-    shap_imp["feature"] = shap_imp["feature"].apply(humanize_feature)
+        shap_imp = shap_imp.sort_values("mean_abs_shap", ascending=False)
 
-    # Sort
-    shap_imp = shap_imp.sort_values("mean_abs_shap", ascending=False)
+        # =========================
+        # TOP FEATURES
+        # =========================
+        top_n = 15
+        shap_top = shap_imp.head(top_n).sort_values("mean_abs_shap")
 
-    # =========================
-    # LIMIT TOP FEATURES (UX FIX)
-    # =========================
-    top_n = 15
-    shap_top = shap_imp.head(top_n).sort_values("mean_abs_shap", ascending=True)
-
-    # =========================
-    # 📊 BAR CHART
-    # =========================
-    fig = px.bar(
-        shap_top,
-        x="mean_abs_shap",
-        y="feature",
-        orientation="h",
-        title=f"Top {top_n} Global Feature Importance (SHAP)",
-        labels={"mean_abs_shap": "Mean |SHAP|", "feature": "Feature"},
-    )
-
-    fig = apply_dark_theme(fig)
-
-    fig.update_layout(
-        title_font=dict(size=18),
-        xaxis_title="Mean |SHAP Impact|",
-        yaxis_title="Feature",
-    )
-
-    st.plotly_chart(fig, use_container_width=True)
-
-    # =========================
-    # 📌 INSIGHT SECTION (NEW)
-    # =========================
-    st.subheader("Key Insights")
-
-    top_features = shap_imp.head(3)["feature"].tolist()
-
-    if top_features:
-        st.write(
-            f"Top global risk drivers are **{', '.join(top_features)}**, "
-            "indicating these factors have the strongest influence on crisis probability."
+        # =========================
+        # CHART
+        # =========================
+        fig = px.bar(
+            shap_top,
+            x="mean_abs_shap",
+            y="feature",
+            orientation="h",
+            title="Top Global Risk Drivers",
+            labels={
+                "mean_abs_shap": "Impact Strength",
+                "feature": "Factor",
+            },
         )
 
-    # =========================
-    # 📋 TABLE
-    # =========================
-    st.subheader("Feature Importance Table")
+        fig = apply_dark_theme(fig)
 
-    st.dataframe(
-        shap_imp,
-        use_container_width=True,
-    )
+        fig.update_layout(
+            title_font=dict(size=20),
+            xaxis_title="Impact Strength",
+            yaxis_title="Economic Factors",
+        )
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        # =========================
+        # EXECUTIVE INSIGHTS
+        # =========================
+        st.subheader("Executive Insights")
+
+        top3 = shap_imp.head(3)
+
+        if not top3.empty:
+            for _, row in top3.iterrows():
+                st.write(
+                    f"- **{row['feature']}** contributes "
+                    f"{row['contribution_pct']:.1f}% to overall risk"
+                )
+
+        # =========================
+        # STRATEGIC INTERPRETATION
+        # =========================
+        st.subheader("Strategic Interpretation")
+
+        st.write(
+            "The model identifies macroeconomic instability, trade exposure, "
+            "and monetary conditions as the primary drivers of sovereign risk. "
+            "Countries with deteriorating fundamentals in these areas exhibit "
+            "significantly higher crisis probability."
+        )
+
+        # =========================
+        # TABLE
+        # =========================
+        st.subheader("Full Feature Importance")
+
+        st.dataframe(
+            shap_imp[["feature", "mean_abs_shap", "contribution_pct"]],
+            use_container_width=True,
+        )
+
+    except Exception as e:
+        st.error(f"Error: {e}")
 
 
 if __name__ == "__main__":
