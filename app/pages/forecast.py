@@ -17,13 +17,16 @@ from utils import (
 
 
 # =========================
-# SAFE FEATURE PREP (FIXED)
+# SAFE FEATURE PREP (FINAL)
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ SMART fill (NOT ZERO)
+    # ✅ STEP 1: mean fill
     aligned = aligned.fillna(aligned.mean())
+
+    # ✅ STEP 2: fallback (CRITICAL)
+    aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -54,6 +57,9 @@ def main():
     # CURRENT PREDICTION
     # =========================
     latest = df_country.sort_values("month").tail(1)
+
+    # 🚨 HARD SAFETY
+    latest = latest.fillna(0)
 
     prob, insights = predict_with_explanations(latest)
 
@@ -90,7 +96,7 @@ def main():
         st.write(a)
 
     # =========================
-    # SCENARIO SIMULATOR (FIXED)
+    # SCENARIO SIMULATOR (FINAL SAFE)
     # =========================
     st.markdown("### Scenario Simulator")
 
@@ -102,13 +108,19 @@ def main():
 
     sim_row = latest.copy()
 
-    # ✅ CLEAN DATA BEFORE SIMULATION
+    # 🚨 CRITICAL FIX → 2-step cleaning
     sim_row = sim_row.fillna(sim_row.mean())
+    sim_row = sim_row.fillna(0)
 
-    # Apply changes
-    sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
-    sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
-    sim_row["exports_pct_gdp"] *= (1 + exp_delta / 100)
+    # Apply transformations safely
+    if "gdp_current_usd" in sim_row.columns:
+        sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
+
+    if "imports_pct_gdp" in sim_row.columns:
+        sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
+
+    if "exports_pct_gdp" in sim_row.columns:
+        sim_row["exports_pct_gdp"] *= (1 + exp_delta / 100)
 
     if "interest_rate_pct" in sim_row.columns:
         sim_row["interest_rate_pct"] += rate_delta / 100
@@ -145,12 +157,17 @@ def main():
         st.write(f"- {txt}")
 
     # =========================
-    # TREND CHART
+    # TREND CHART (SAFE)
     # =========================
     aligned_series = prepare_features(df_country, model)
 
     df_country = df_country.copy()
-    df_country["crisis_prob"] = model.predict_proba(aligned_series)[:, 1]
+
+    try:
+        df_country["crisis_prob"] = model.predict_proba(aligned_series)[:, 1]
+    except Exception:
+        st.warning("Trend unavailable due to data issues")
+        return
 
     recent = df_country.sort_values("month").tail(24)
 
@@ -165,7 +182,13 @@ def main():
             title="Crisis Risk Trend with Confidence Band",
         )
 
-        fig.add_scatter(x=recent["month"], y=recent["upper"], mode="lines", line=dict(width=0))
+        fig.add_scatter(
+            x=recent["month"],
+            y=recent["upper"],
+            mode="lines",
+            line=dict(width=0),
+        )
+
         fig.add_scatter(
             x=recent["month"],
             y=recent["lower"],
