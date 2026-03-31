@@ -4,13 +4,32 @@ import plotly.express as px
 import streamlit as st
 import pandas as pd
 
-from utils import (
+from app.utils import (
     load_shap,
     humanize_feature,
     apply_dark_theme,
     load_model,
     load_feature_cols,
 )
+
+
+# =========================
+# FEATURE GROUPING (NEW 🔥)
+# =========================
+def categorize_feature(feat: str) -> str:
+    feat = feat.lower()
+
+    if "gdp" in feat:
+        return "Economic Growth"
+    elif "inflation" in feat or "interest" in feat:
+        return "Monetary Conditions"
+    elif "export" in feat or "import" in feat:
+        return "Trade Exposure"
+    elif "unemployment" in feat:
+        return "Labor Market"
+    else:
+        return "Other"
+
 
 # =========================
 # MAIN
@@ -22,7 +41,7 @@ def main():
         shap_imp = load_shap()
 
         # =========================
-        # FALLBACK (MODEL IMPORTANCE)
+        # FALLBACK
         # =========================
         if shap_imp.empty:
             model = load_model()
@@ -50,7 +69,7 @@ def main():
         shap_imp = shap_imp.dropna(subset=["feature", "mean_abs_shap"])
 
         # =========================
-        # NORMALIZATION (IMPORTANT)
+        # NORMALIZE
         # =========================
         total = shap_imp["mean_abs_shap"].sum()
 
@@ -61,6 +80,10 @@ def main():
         else:
             shap_imp["contribution_pct"] = 0
 
+        # =========================
+        # HUMANIZE + CATEGORY
+        # =========================
+        shap_imp["category"] = shap_imp["feature"].apply(categorize_feature)
         shap_imp["feature"] = shap_imp["feature"].apply(humanize_feature)
 
         shap_imp = shap_imp.sort_values("mean_abs_shap", ascending=False)
@@ -79,6 +102,7 @@ def main():
             x="mean_abs_shap",
             y="feature",
             orientation="h",
+            color="category",
             title="Top Global Risk Drivers",
             labels={
                 "mean_abs_shap": "Impact Strength",
@@ -88,13 +112,29 @@ def main():
 
         fig = apply_dark_theme(fig)
 
-        fig.update_layout(
-            title_font=dict(size=20),
-            xaxis_title="Impact Strength",
-            yaxis_title="Economic Factors",
+        st.plotly_chart(fig, use_container_width=True)
+
+        # =========================
+        # CATEGORY IMPORTANCE (NEW 🔥)
+        # =========================
+        st.subheader("Risk Contribution by Category")
+
+        cat = (
+            shap_imp.groupby("category")["contribution_pct"]
+            .sum()
+            .reset_index()
+            .sort_values("contribution_pct", ascending=False)
         )
 
-        st.plotly_chart(fig, use_container_width=True)
+        fig2 = px.pie(
+            cat,
+            names="category",
+            values="contribution_pct",
+            title="Macro Risk Breakdown",
+        )
+
+        fig2 = apply_dark_theme(fig2)
+        st.plotly_chart(fig2, use_container_width=True)
 
         # =========================
         # EXECUTIVE INSIGHTS
@@ -103,32 +143,38 @@ def main():
 
         top3 = shap_imp.head(3)
 
-        if not top3.empty:
-            for _, row in top3.iterrows():
-                st.write(
-                    f"- **{row['feature']}** contributes "
-                    f"{row['contribution_pct']:.1f}% to overall risk"
-                )
+        for _, row in top3.iterrows():
+            st.write(
+                f"- **{row['feature']}** contributes "
+                f"{row['contribution_pct']:.1f}% to risk"
+            )
 
         # =========================
         # STRATEGIC INTERPRETATION
         # =========================
         st.subheader("Strategic Interpretation")
 
+        dominant = cat.iloc[0]["category"] if not cat.empty else None
+
+        if dominant:
+            st.write(
+                f"The model indicates that **{dominant}** is the dominant driver "
+                "of sovereign risk. Policy focus in this area can significantly "
+                "reduce financial instability."
+            )
+
         st.write(
-            "The model identifies macroeconomic instability, trade exposure, "
-            "and monetary conditions as the primary drivers of sovereign risk. "
-            "Countries with deteriorating fundamentals in these areas exhibit "
-            "significantly higher crisis probability."
+            "Overall, sovereign risk is driven by a combination of macroeconomic "
+            "instability, monetary tightening, and external trade exposure."
         )
 
         # =========================
         # TABLE
         # =========================
-        st.subheader("Full Feature Importance")
+        st.subheader("Detailed Feature Importance")
 
         st.dataframe(
-            shap_imp[["feature", "mean_abs_shap", "contribution_pct"]],
+            shap_imp[["feature", "category", "contribution_pct"]],
             use_container_width=True,
         )
 
