@@ -5,7 +5,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# ✅ FIXED IMPORT
 from utils import (
     align_features,
     load_data,
@@ -16,12 +15,14 @@ from utils import (
     humanize_feature,
 )
 
-
 # =========================
 # ADD PROBABILITIES
 # =========================
 def add_probabilities(df: pd.DataFrame, model) -> pd.DataFrame:
-    aligned = align_features(df).fillna(0)
+    aligned = align_features(df)
+
+    # ✅ global safety
+    aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -29,17 +30,22 @@ def add_probabilities(df: pd.DataFrame, model) -> pd.DataFrame:
     aligned = aligned.astype(float)
 
     df = df.copy()
-    df["crisis_prob"] = model.predict_proba(aligned)[:, 1]
+
+    try:
+        df["crisis_prob"] = model.predict_proba(aligned)[:, 1]
+    except Exception:
+        df["crisis_prob"] = 0.0
+
     df["risk_level"] = df["crisis_prob"].apply(risk_label)
 
     return df
 
 
 # =========================
-# SHAP DRIVERS (FIXED)
+# SHAP DRIVERS
 # =========================
 def top_shap_drivers(row: pd.DataFrame, explainer, top_n: int = 2):
-    aligned = align_features(row).iloc[[0]]
+    aligned = align_features(row).fillna(0).iloc[[0]]
 
     shap_values = explainer.shap_values(aligned)
     if isinstance(shap_values, list):
@@ -52,10 +58,13 @@ def top_shap_drivers(row: pd.DataFrame, explainer, top_n: int = 2):
 
     drivers = []
     for i in top_idx:
-        feat = cols[int(i)]
-        direction = "↑" if shap_values[int(i)] > 0 else "↓"
+        idx = int(i)
+        if idx >= len(cols):
+            continue
 
-        # ✅ HUMAN READABLE FIX
+        feat = cols[idx]
+        direction = "↑" if shap_values[idx] > 0 else "↓"
+
         drivers.append(f"{humanize_feature(feat)} {direction}")
 
     return drivers
@@ -77,6 +86,7 @@ def main():
         df.sort_values("month")
         .groupby("country")
         .tail(1)
+        .dropna(subset=["crisis_prob"])
         .sort_values("crisis_prob", ascending=False)
     )
 
@@ -86,9 +96,11 @@ def main():
     total_countries = latest["country"].nunique()
     high_risk = (latest["risk_level"] == "HIGH").sum()
     avg_prob = latest["crisis_prob"].mean()
+
     top_risk = latest.iloc[0] if not latest.empty else None
 
     col1, col2, col3, col4 = st.columns(4)
+
     col1.metric("Total Countries", total_countries)
     col2.metric("High Risk Countries", high_risk)
     col3.metric("Avg Crisis Probability", f"{avg_prob:.2%}")
@@ -97,7 +109,7 @@ def main():
         col4.metric(
             "Top Risk Country",
             top_risk["country"],
-            f"{top_risk['crisis_prob']:.1%}"
+            f"{top_risk['crisis_prob']:.1%}",
         )
     else:
         col4.metric("Top Risk Country", "N/A")
@@ -110,10 +122,17 @@ def main():
     dist = latest["risk_level"].value_counts().reset_index()
     dist.columns = ["risk_level", "count"]
 
-    fig_dist = px.bar(dist, x="risk_level", y="count", title="Risk Levels")
-    fig_dist = apply_dark_theme(fig_dist)
-
-    st.plotly_chart(fig_dist, use_container_width=True)
+    if not dist.empty:
+        fig_dist = px.bar(
+            dist,
+            x="risk_level",
+            y="count",
+            title="Risk Level Distribution"
+        )
+        fig_dist = apply_dark_theme(fig_dist)
+        st.plotly_chart(fig_dist, use_container_width=True)
+    else:
+        st.warning("No data available")
 
     # =========================
     # GLOBAL TREND
@@ -121,14 +140,23 @@ def main():
     st.subheader("Global Risk Trend")
 
     trend = df.groupby("month")["crisis_prob"].mean().reset_index()
+    trend = trend.dropna()
 
-    fig_trend = px.line(trend, x="month", y="crisis_prob")
-    fig_trend = apply_dark_theme(fig_trend)
+    if not trend.empty:
+        fig_trend = px.line(
+            trend,
+            x="month",
+            y="crisis_prob",
+            title="Global Crisis Probability Trend"
+        )
+        fig_trend = apply_dark_theme(fig_trend)
 
-    fig_trend.update_traces(line=dict(width=3))
-    fig_trend.update_layout(yaxis_tickformat=".0%")
+        fig_trend.update_traces(line=dict(width=3))
+        fig_trend.update_layout(yaxis_tickformat=".0%")
 
-    st.plotly_chart(fig_trend, use_container_width=True)
+        st.plotly_chart(fig_trend, use_container_width=True)
+    else:
+        st.warning("Insufficient data for trend")
 
     # =========================
     # TOP COUNTRIES
@@ -137,34 +165,47 @@ def main():
 
     top3 = latest.head(3)
 
-    for _, row in top3.iterrows():
-        drivers = top_shap_drivers(
-            df[df["country"] == row["country"]].tail(1),
-            explainer
-        )
+    if not top3.empty:
+        for _, row in top3.iterrows():
+            drivers = top_shap_drivers(
+                df[df["country"] == row["country"]].tail(1),
+                explainer
+            )
 
-        st.write(
-            f"- **{row['country']}** — {row['crisis_prob']:.1%} risk | Drivers: {', '.join(drivers)}"
-        )
+            st.write(
+                f"- **{row['country']}** — {row['crisis_prob']:.1%} risk | Drivers: {', '.join(drivers)}"
+            )
+    else:
+        st.warning("No high-risk countries available")
 
     # =========================
     # BENCHMARK
     # =========================
     st.subheader("Country vs Global Benchmark")
 
-    selected = st.selectbox("Select country", sorted(latest["country"].unique()))
+    country_list = sorted(latest["country"].unique())
 
-    sel_prob = float(latest[latest["country"] == selected]["crisis_prob"])
-    diff = sel_prob - avg_prob
+    if country_list:
+        selected = st.selectbox("Select country", country_list)
 
-    if diff > 0.002:
-        label = "Above global risk"
-    elif diff < -0.002:
-        label = "Below global risk"
+        row = latest[latest["country"] == selected]
+
+        if not row.empty:
+            sel_prob = float(row["crisis_prob"].values[0])
+            diff = sel_prob - avg_prob
+
+            if diff > 0.002:
+                label = "Above global risk"
+            elif diff < -0.002:
+                label = "Below global risk"
+            else:
+                label = "In line with global average"
+
+            st.write(f"{selected}: {label}")
+        else:
+            st.warning("Country data unavailable")
     else:
-        label = "In line with global average"
-
-    st.write(f"{selected}: {label}")
+        st.warning("No countries available")
 
 
 if __name__ == "__main__":
