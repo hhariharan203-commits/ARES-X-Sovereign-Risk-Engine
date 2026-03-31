@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.utils import (
+from utils import (
     load_data,
     load_model,
     align_features,
