@@ -40,6 +40,10 @@ def prepare_features(df, model):
 # MAIN
 # =========================
 def main():
+
+    import plotly.express as px
+    import shap
+    
     st.title("Country Intelligence")
 
     try:
