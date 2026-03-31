@@ -17,18 +17,16 @@ from utils import (
 
 
 # =========================
-# SAFE FEATURE PREP (FINAL)
+# SAFE FEATURE PREP
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ ONLY NUMERIC MEAN
     numeric_cols = aligned.select_dtypes(include=[np.number]).columns
     aligned[numeric_cols] = aligned[numeric_cols].fillna(
         aligned[numeric_cols].mean()
     )
 
-    # ✅ FALLBACK
     aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
@@ -60,8 +58,18 @@ def main():
     cols = ["month", "gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]
     df_plot = df_country[cols].copy()
 
+    # 🔥 FINAL FIX (CHART ISSUE)
+    df_plot = df_plot.sort_values("month")
+
     df_plot = df_plot.dropna(
+        how="all",
         subset=["gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]
+    )
+
+    df_plot[["gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]] = (
+        df_plot[["gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]]
+        .ffill()
+        .bfill()
     )
 
     if df_plot.empty or len(df_plot) < 3:
@@ -81,6 +89,7 @@ def main():
 
         fig = apply_dark_theme(fig)
         fig.update_traces(line=dict(width=3))
+
         st.plotly_chart(fig, use_container_width=True)
 
     # =========================
@@ -94,7 +103,6 @@ def main():
 
     latest = df_country.sort_values("month").tail(1)
 
-    # ✅ NUMERIC SAFE CLEAN
     numeric_cols = latest.select_dtypes(include=[np.number]).columns
     latest[numeric_cols] = latest[numeric_cols].fillna(
         latest[numeric_cols].mean()
@@ -157,7 +165,6 @@ def main():
 
     sim_row = latest.copy()
 
-    # ✅ NUMERIC SAFE CLEAN
     numeric_cols = sim_row.select_dtypes(include=[np.number]).columns
     sim_row[numeric_cols] = sim_row[numeric_cols].fillna(
         sim_row[numeric_cols].mean()
@@ -165,7 +172,6 @@ def main():
 
     sim_row = sim_row.fillna(0)
 
-    # Safe transformations
     if "gdp_current_usd" in sim_row.columns:
         sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
 
