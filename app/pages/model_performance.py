@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import streamlit as st
 from sklearn.metrics import confusion_matrix, roc_curve, auc
 
-from app.utils import safe_metric
+from utils import safe_metric
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
 METRICS_PATH = os.path.join(BASE_DIR, "data", "model_metrics.csv")
