@@ -62,12 +62,8 @@ def load_explainer():
 # ================= CORE =================
 def align_features(df: pd.DataFrame) -> pd.DataFrame:
     cols = load_feature_cols()
-
     df_aligned = df.reindex(columns=cols)
-
-    # ✅ CRITICAL: enforce numeric
     df_aligned = df_aligned.apply(pd.to_numeric, errors="coerce")
-
     return df_aligned[cols]
 
 
@@ -85,68 +81,68 @@ def predict_with_explanations(df_row: pd.DataFrame):
     model = load_model()
     explainer = load_explainer()
 
-    # =========================
-    # LOAD DATA
-    # =========================
     full_df = load_data()
     country = df_row["country"].iloc[0]
 
     country_hist = full_df[full_df["country"] == country]
     global_hist = full_df.copy()
 
-    # =========================
-    # ALIGN FEATURES
-    # =========================
+    # Align all
     aligned = align_features(df_row).iloc[[0]]
     aligned_country = align_features(country_hist)
     aligned_global = align_features(global_hist)
 
     numeric_cols = aligned.columns
 
-    # =========================
-    # 🔥 HYBRID IMPUTATION (FINAL)
-    # =========================
-    # 1. Country mean
-    aligned[numeric_cols] = aligned[numeric_cols].fillna(
-        aligned_country[numeric_cols].mean()
-    )
+    # Track missing ratio before imputation for warning
+    missing_ratio = aligned.isnull().mean(axis=1).iloc[0]
 
-    # 2. Global mean fallback
+    # ✅ STEP 1: forward-fill from country history
+    # Gets most recent actual recorded value per feature for this country
+    # This is what makes ARG/GBR/TUR unique instead of all getting global mean
+    if not aligned_country.empty:
+        country_last_known = aligned_country.ffill().tail(1)
+        if not country_last_known.empty:
+            aligned[numeric_cols] = aligned[numeric_cols].fillna(
+                country_last_known[numeric_cols].iloc[0]
+            )
+
+    # ✅ STEP 2: country mean fallback
+    if not aligned_country.empty:
+        aligned[numeric_cols] = aligned[numeric_cols].fillna(
+            aligned_country[numeric_cols].mean()
+        )
+
+    # ✅ STEP 3: global mean fallback
     aligned[numeric_cols] = aligned[numeric_cols].fillna(
         aligned_global[numeric_cols].mean()
     )
 
-    # 3. Final fallback
+    # ✅ STEP 4: final zero fallback
     aligned = aligned.fillna(0)
 
-    # =========================
-    # MODEL ALIGNMENT
-    # =========================
+    # Model alignment
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
 
     aligned = aligned.astype(float)
 
-    # =========================
-    # VALIDATION
-    # =========================
+    # Validation
     if not np.isfinite(aligned.values).all():
         return 0.25, ["Data issue — fallback prediction"]
 
-    # =========================
-    # PREDICTION
-    # =========================
+    # Prediction
     try:
         prob = float(model.predict_proba(aligned)[0, 1])
     except Exception:
         return 0.25, ["Model failed — fallback prediction"]
 
-    # =========================
-    # SHAP EXPLANATION
-    # =========================
+    # Low data flag
+    low_data = missing_ratio > 0.5
+
+    # SHAP explanations
     try:
         shap_values = explainer.shap_values(aligned)
-
         if isinstance(shap_values, list):
             shap_values = shap_values[1]
 
@@ -162,12 +158,12 @@ def predict_with_explanations(df_row: pd.DataFrame):
             direction = "↑" if val > 0 else "↓"
             insights.append(f"{humanize_feature(feat)} {direction}")
 
+        if low_data:
+            insights.append("⚠️ Sparse data — imputed from history/global mean")
+
     except Exception:
         insights = ["Explainability unavailable"]
 
-    # =========================
-    # LOW VARIANCE WARNING
-    # =========================
     if aligned.std(axis=1).values[0] < 1e-5:
         insights.append("⚠️ Low data variability — low confidence")
 
@@ -185,10 +181,10 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
     order = np.argsort(np.abs(shap_values))[::-1]
 
     group_map = {
-        "gdp": "Economic Growth",
-        "interest": "Interest Rates",
-        "import": "Import Dependency",
-        "export": "Export Strength",
+        "gdp":          "Economic Growth",
+        "interest":     "Interest Rates",
+        "import":       "Import Dependency",
+        "export":       "Export Strength",
         "unemployment": "Labor Market",
     }
 
@@ -249,8 +245,6 @@ def apply_dark_theme(fig):
 @lru_cache(maxsize=1)
 def load_shap():
     shap_path = BASE_DIR / "outputs" / "shap_importance.csv"
-
     if shap_path.exists():
         return pd.read_csv(shap_path)
-
     return pd.DataFrame()
