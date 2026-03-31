@@ -26,24 +26,20 @@ def humanize_feature(feat: str) -> str:
     feat = feat.replace("_", " ").title()
     return feat
 
-
 # ================= LOADERS =================
 @lru_cache(maxsize=1)
 def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH, parse_dates=["month"])
     return df.sort_values(["country", "month"]).reset_index(drop=True)
 
-
 @lru_cache(maxsize=1)
 def load_model():
     return joblib.load(MODEL_PATH)
-
 
 @lru_cache(maxsize=1)
 def load_feature_cols() -> list[str]:
     with open(FEATURE_COLS_PATH) as f:
         return json.load(f)
-
 
 @lru_cache(maxsize=1)
 def load_thresholds() -> dict:
@@ -52,23 +48,15 @@ def load_thresholds() -> dict:
             return json.load(f)
     return {"low": 0.33, "high": 0.66}
 
-
 @lru_cache(maxsize=1)
 def load_explainer():
     return shap.TreeExplainer(load_model())
 
-
 # ================= CORE =================
 def align_features(df: pd.DataFrame) -> pd.DataFrame:
     cols = load_feature_cols()
-
     df_aligned = df.reindex(columns=cols)
-
-    # 🚨 CRITICAL FIX → handle missing values globally
-    df_aligned = df_aligned.fillna(0)
-
-    return df_aligned[cols]
-
+    return df_aligned[cols]  # ❌ no fillna here
 
 def risk_label(prob: float) -> str:
     t = load_thresholds()
@@ -78,7 +66,6 @@ def risk_label(prob: float) -> str:
         return "MEDIUM"
     return "HIGH"
 
-
 # ================= PREDICTION =================
 def predict_with_explanations(df_row: pd.DataFrame):
     model = load_model()
@@ -86,9 +73,12 @@ def predict_with_explanations(df_row: pd.DataFrame):
 
     aligned = align_features(df_row).iloc[[0]]
 
-    # 🚨 SAFETY CHECK
-    if aligned.isnull().values.any():
-        aligned = aligned.fillna(0)
+    # ✅ SMART FILL (avoid identical predictions)
+    aligned = aligned.fillna(aligned.mean())
+
+    # ✅ FINAL SAFETY (only if everything missing)
+    if aligned.isnull().all(axis=None):
+        return 0.25, ["Insufficient data for reliable prediction"]
 
     prob = float(model.predict_proba(aligned)[0, 1])
 
@@ -109,7 +99,6 @@ def predict_with_explanations(df_row: pd.DataFrame):
         insights.append(f"{humanize_feature(feat)} {direction}")
 
     return prob, insights
-
 
 # ================= EXECUTIVE INSIGHTS =================
 def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
@@ -148,7 +137,6 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
             drivers.append(f"- {group} is {direction} financial risk")
             seen_groups.add(group)
 
-            # ✅ PROFESSIONAL ACTIONS
             if group == "Interest Rates":
                 actions.append("Review central bank rate policy to control inflation")
             elif group == "Export Strength":
@@ -163,18 +151,13 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
         if len(drivers) == 3:
             break
 
-    # ✅ CLEAN SUMMARY
-    if drivers:
-        summary = drivers[0].replace("- ", "").capitalize()
-    else:
-        summary = "Overall risk remains stable"
+    summary = drivers[0].replace("- ", "").capitalize() if drivers else "Overall risk remains stable"
 
     return {
         "summary": summary,
         "drivers": drivers,
         "actions": list(set(actions)),
     }
-
 
 # ================= UI HELPERS =================
 def apply_dark_theme(fig):
@@ -185,7 +168,6 @@ def apply_dark_theme(fig):
         font=dict(color="white"),
     )
     return fig
-
 
 # ================= SHAP LOADER =================
 @lru_cache(maxsize=1)
