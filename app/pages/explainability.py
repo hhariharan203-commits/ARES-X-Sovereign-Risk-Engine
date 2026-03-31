@@ -4,7 +4,7 @@ import plotly.express as px
 import streamlit as st
 import pandas as pd
 
-from app.utils import (
+from utils import (
     load_shap,
     humanize_feature,
     apply_dark_theme,
