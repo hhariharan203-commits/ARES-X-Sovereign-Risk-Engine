@@ -17,13 +17,15 @@ THRESHOLDS_PATH = BASE_DIR / "models" / "risk_thresholds.json"
 
 # ================= FEATURE NAME CLEANING =================
 def humanize_feature(feat: str) -> str:
-    feat = feat.replace("_pct", "")
-    feat = feat.replace("_usd", "")
+    feat = feat.replace("_pct", "%")
+    feat = feat.replace("_usd", " USD")
     feat = feat.replace("_lag1", " (Short-term)")
     feat = feat.replace("_lag3", " (Medium-term)")
+    feat = feat.replace("_lag6", " (Long-term)")
     feat = feat.replace("_z", " (Normalized)")
     feat = feat.replace("_", " ").title()
     return feat
+
 
 # ================= LOADERS =================
 @lru_cache(maxsize=1)
@@ -31,14 +33,17 @@ def load_data() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH, parse_dates=["month"])
     return df.sort_values(["country", "month"]).reset_index(drop=True)
 
+
 @lru_cache(maxsize=1)
 def load_model():
     return joblib.load(MODEL_PATH)
+
 
 @lru_cache(maxsize=1)
 def load_feature_cols() -> list[str]:
     with open(FEATURE_COLS_PATH) as f:
         return json.load(f)
+
 
 @lru_cache(maxsize=1)
 def load_thresholds() -> dict:
@@ -47,14 +52,23 @@ def load_thresholds() -> dict:
             return json.load(f)
     return {"low": 0.33, "high": 0.66}
 
+
 @lru_cache(maxsize=1)
 def load_explainer():
     return shap.TreeExplainer(load_model())
 
+
 # ================= CORE =================
 def align_features(df: pd.DataFrame) -> pd.DataFrame:
     cols = load_feature_cols()
-    return df.reindex(columns=cols, fill_value=0)[cols]
+
+    df_aligned = df.reindex(columns=cols)
+
+    # 🚨 CRITICAL FIX → handle missing values globally
+    df_aligned = df_aligned.fillna(0)
+
+    return df_aligned[cols]
+
 
 def risk_label(prob: float) -> str:
     t = load_thresholds()
@@ -64,12 +78,18 @@ def risk_label(prob: float) -> str:
         return "MEDIUM"
     return "HIGH"
 
+
 # ================= PREDICTION =================
 def predict_with_explanations(df_row: pd.DataFrame):
     model = load_model()
     explainer = load_explainer()
 
     aligned = align_features(df_row).iloc[[0]]
+
+    # 🚨 SAFETY CHECK
+    if aligned.isnull().values.any():
+        aligned = aligned.fillna(0)
+
     prob = float(model.predict_proba(aligned)[0, 1])
 
     shap_values = explainer.shap_values(aligned)
@@ -89,6 +109,7 @@ def predict_with_explanations(df_row: pd.DataFrame):
         insights.append(f"{humanize_feature(feat)} {direction}")
 
     return prob, insights
+
 
 # ================= EXECUTIVE INSIGHTS =================
 def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
@@ -127,29 +148,34 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
             drivers.append(f"- {group} is {direction} financial risk")
             seen_groups.add(group)
 
+            # ✅ PROFESSIONAL ACTIONS
             if group == "Interest Rates":
-                actions.append("Adjust monetary policy")
+                actions.append("Review central bank rate policy to control inflation")
             elif group == "Export Strength":
-                actions.append("Boost export performance")
+                actions.append("Enhance export competitiveness through trade incentives")
             elif group == "Import Dependency":
-                actions.append("Reduce import reliance")
+                actions.append("Reduce import dependency via domestic production")
             elif group == "Economic Growth":
-                actions.append("Stimulate GDP growth")
+                actions.append("Deploy fiscal stimulus to support economic growth")
+            elif group == "Labor Market":
+                actions.append("Strengthen labor market through job creation programs")
 
         if len(drivers) == 3:
             break
 
+    # ✅ CLEAN SUMMARY
     if drivers:
-        summary = "Key risk is driven by " + drivers[0].replace("- ", "").lower()
+        summary = drivers[0].replace("- ", "").capitalize()
     else:
-        summary = "Risk remains stable"
+        summary = "Overall risk remains stable"
 
     return {
         "summary": summary,
         "drivers": drivers,
         "actions": list(set(actions)),
     }
-    
+
+
 # ================= UI HELPERS =================
 def apply_dark_theme(fig):
     fig.update_layout(
@@ -165,8 +191,8 @@ def apply_dark_theme(fig):
 @lru_cache(maxsize=1)
 def load_shap():
     shap_path = BASE_DIR / "outputs" / "shap_importance.csv"
-    
+
     if shap_path.exists():
         return pd.read_csv(shap_path)
-    
+
     return pd.DataFrame()
