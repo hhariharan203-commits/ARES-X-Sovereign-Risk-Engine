@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import (
+from app.utils import (
     load_data,
     load_model,
     align_features,
