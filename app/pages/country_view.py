@@ -22,10 +22,13 @@ from utils import (
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ STEP 1: mean fill
-    aligned = aligned.fillna(aligned.mean())
+    # ✅ ONLY NUMERIC MEAN
+    numeric_cols = aligned.select_dtypes(include=[np.number]).columns
+    aligned[numeric_cols] = aligned[numeric_cols].fillna(
+        aligned[numeric_cols].mean()
+    )
 
-    # ✅ STEP 2: fallback (CRITICAL)
+    # ✅ FALLBACK
     aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
@@ -91,13 +94,13 @@ def main():
 
     latest = df_country.sort_values("month").tail(1)
 
-    # 🚨 HARD CLEAN
-    latest = latest.fillna(latest.mean())
-    latest = latest.fillna(0)
+    # ✅ NUMERIC SAFE CLEAN
+    numeric_cols = latest.select_dtypes(include=[np.number]).columns
+    latest[numeric_cols] = latest[numeric_cols].fillna(
+        latest[numeric_cols].mean()
+    )
 
-    missing_ratio = latest.isnull().mean().mean()
-    if missing_ratio > 0.4:
-        st.warning("⚠️ Limited data. Prediction reliability may be low.")
+    latest = latest.fillna(0)
 
     try:
         prob, insights = predict_with_explanations(latest)
@@ -154,8 +157,12 @@ def main():
 
     sim_row = latest.copy()
 
-    # 🚨 SAFE CLEAN
-    sim_row = sim_row.fillna(sim_row.mean())
+    # ✅ NUMERIC SAFE CLEAN
+    numeric_cols = sim_row.select_dtypes(include=[np.number]).columns
+    sim_row[numeric_cols] = sim_row[numeric_cols].fillna(
+        sim_row[numeric_cols].mean()
+    )
+
     sim_row = sim_row.fillna(0)
 
     # Safe transformations
