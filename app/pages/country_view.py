@@ -15,14 +15,15 @@ from utils import (
     apply_dark_theme,
 )
 
+
 # =========================
 # PREPARE FEATURES
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ safety
-    aligned = aligned.fillna(0)
+    # ✅ SMART fill (not zero)
+    aligned = aligned.fillna(aligned.mean())
 
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -46,32 +47,36 @@ def main():
     df_country = df[df["country"] == country].copy()
 
     # =========================
-    # 📊 ECONOMIC INDICATORS
+    # 📊 ECONOMIC INDICATORS (FIXED)
     # =========================
     st.subheader(f"Economic Indicators — {country}")
 
-    df_plot = df_country.rename(columns={
-        "gdp_current_usd": "GDP (USD)",
-        "exports_pct_gdp": "Exports (% GDP)",
-        "imports_pct_gdp": "Imports (% GDP)",
-    })
+    cols = ["month", "gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]
+    df_plot = df_country[cols].copy()
 
-    # ✅ FIX: remove empty rows
-    df_plot = df_plot.dropna()
+    df_plot = df_plot.dropna(
+        subset=["gdp_current_usd", "exports_pct_gdp", "imports_pct_gdp"]
+    )
 
-    if not df_plot.empty:
+    if df_plot.empty or len(df_plot) < 3:
+        st.warning("No sufficient data for chart")
+    else:
+        df_plot = df_plot.rename(columns={
+            "gdp_current_usd": "GDP (USD)",
+            "exports_pct_gdp": "Exports (% GDP)",
+            "imports_pct_gdp": "Imports (% GDP)",
+        })
+
         fig = px.line(
             df_plot,
             x="month",
             y=["GDP (USD)", "Exports (% GDP)", "Imports (% GDP)"],
-            title=f"Economic Indicators — {country}",
         )
 
         fig = apply_dark_theme(fig)
         fig.update_traces(line=dict(width=3))
+
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning("No sufficient data for chart")
 
     # =========================
     # 🔮 LATEST PREDICTION
@@ -81,10 +86,10 @@ def main():
     if not df_country.empty:
         latest = df_country.sort_values("month").tail(1)
 
-        # 🚨 CRITICAL FIX
-        if latest.isnull().all(axis=1).values[0]:
-            st.error("❌ No valid data available for prediction")
-            return
+        # 🚨 data quality warning
+        missing_ratio = latest.isnull().mean().mean()
+        if missing_ratio > 0.4:
+            st.warning("⚠️ Limited data available. Prediction may be less reliable.")
 
         prob, insights = predict_with_explanations(latest)
 
@@ -125,10 +130,6 @@ def main():
         # =========================
         st.markdown("### Scenario Simulator")
 
-        # 🚨 warning if bad data
-        if latest.isnull().sum().sum() > 0:
-            st.warning("⚠️ Simulation may be less accurate due to missing data")
-
         st.markdown("#### Economic Growth")
         gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0, 0.5)
 
@@ -142,8 +143,8 @@ def main():
 
         sim_row = latest.copy()
 
-        # ✅ safe transformations
-        sim_row = sim_row.fillna(0)
+        # ✅ SMART fill (not zero)
+        sim_row = sim_row.fillna(sim_row.mean())
 
         sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
         sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
@@ -169,7 +170,6 @@ def main():
 
         change = sim_prob - prob
 
-        # ✅ better threshold
         if change > 0.05:
             st.error("Risk is significantly increasing under this scenario")
         elif change < -0.05:
