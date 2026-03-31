@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import apply_dark_theme, load_data, add_probabilities
+from app.utils import apply_dark_theme, load_data, add_probabilities
 
 
 def main():
@@ -15,19 +15,45 @@ def main():
             st.warning("No data available")
             return
 
-        # Ensure datetime
+        # =========================
+        # VALIDATION
+        # =========================
+        required_cols = {"country", "month"}
+        if not required_cols.issubset(df.columns):
+            st.error("Required columns missing (country/month)")
+            return
+
         df["month"] = pd.to_datetime(df["month"], errors="coerce")
 
-        # ALWAYS recompute predictions (single source of truth)
+        # =========================
+        # PREDICTIONS
+        # =========================
         df = add_probabilities(df)
 
-        # Latest snapshot
+        # =========================
+        # LATEST SNAPSHOT
+        # =========================
         latest_month = df["month"].max()
         latest_df = df[df["month"] == latest_month].copy()
 
         if latest_df.empty:
             st.warning("No latest data available")
             return
+
+        # =========================
+        # KPIs (NEW 🔥)
+        # =========================
+        col1, col2, col3 = st.columns(3)
+
+        total = len(latest_df)
+        high_risk = (latest_df["risk_level"] == "HIGH").sum()
+        avg_prob = latest_df["crisis_prob"].mean()
+
+        col1.metric("Countries", total)
+        col2.metric("High Risk Countries", high_risk)
+        col3.metric("Average Risk", f"{avg_prob:.2%}")
+
+        st.markdown("---")
 
         # =========================
         # TABLE
@@ -48,7 +74,11 @@ def main():
         # =========================
         st.subheader("Risk Distribution")
 
-        risk_counts = latest_df["risk_level"].value_counts()
+        risk_counts = (
+            latest_df["risk_level"]
+            .value_counts()
+            .reindex(["LOW", "MEDIUM", "HIGH"], fill_value=0)
+        )
 
         fig_pie = px.pie(
             names=risk_counts.index,
@@ -85,28 +115,31 @@ def main():
         # =========================
         st.subheader("Global Risk Map")
 
-        fig_map = px.choropleth(
-            latest_df,
-            locations="country",
-            locationmode="ISO-3",
-            color="crisis_prob",
-            hover_name="country",
-            color_continuous_scale=[
-                [0, "green"],
-                [0.5, "yellow"],
-                [1, "red"],
-            ],
-            title="Global Crisis Probability",
-        )
+        if "country" in latest_df.columns:
+            fig_map = px.choropleth(
+                latest_df,
+                locations="country",
+                locationmode="ISO-3",
+                color="crisis_prob",
+                hover_name="country",
+                color_continuous_scale=[
+                    [0, "green"],
+                    [0.5, "yellow"],
+                    [1, "red"],
+                ],
+                title="Global Crisis Probability",
+            )
 
-        fig_map.update_layout(
-            geo=dict(bgcolor="#0e1117"),
-            coloraxis_showscale=False,
-        )
+            fig_map.update_layout(
+                geo=dict(bgcolor="#0e1117"),
+                coloraxis_showscale=False,
+            )
 
-        fig_map = apply_dark_theme(fig_map)
+            fig_map = apply_dark_theme(fig_map)
 
-        st.plotly_chart(fig_map, use_container_width=True)
+            st.plotly_chart(fig_map, use_container_width=True)
+        else:
+            st.warning("Country codes not available for map")
 
     except Exception as e:
         st.error(f"Error: {e}")
