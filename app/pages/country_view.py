@@ -17,13 +17,16 @@ from utils import (
 
 
 # =========================
-# PREPARE FEATURES
+# SAFE FEATURE PREP (FINAL)
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
 
-    # ✅ SMART fill (not zero)
+    # ✅ STEP 1: mean fill
     aligned = aligned.fillna(aligned.mean())
+
+    # ✅ STEP 2: fallback (CRITICAL)
+    aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -47,7 +50,7 @@ def main():
     df_country = df[df["country"] == country].copy()
 
     # =========================
-    # 📊 ECONOMIC INDICATORS (FIXED)
+    # 📊 ECONOMIC INDICATORS
     # =========================
     st.subheader(f"Economic Indicators — {country}")
 
@@ -75,7 +78,6 @@ def main():
 
         fig = apply_dark_theme(fig)
         fig.update_traces(line=dict(width=3))
-
         st.plotly_chart(fig, use_container_width=True)
 
     # =========================
@@ -83,30 +85,41 @@ def main():
     # =========================
     st.subheader("Latest Crisis Prediction")
 
-    if not df_country.empty:
-        latest = df_country.sort_values("month").tail(1)
+    if df_country.empty:
+        st.info("No data available for this country.")
+        return
 
-        # 🚨 data quality warning
-        missing_ratio = latest.isnull().mean().mean()
-        if missing_ratio > 0.4:
-            st.warning("⚠️ Limited data available. Prediction may be less reliable.")
+    latest = df_country.sort_values("month").tail(1)
 
+    # 🚨 HARD CLEAN
+    latest = latest.fillna(latest.mean())
+    latest = latest.fillna(0)
+
+    missing_ratio = latest.isnull().mean().mean()
+    if missing_ratio > 0.4:
+        st.warning("⚠️ Limited data. Prediction reliability may be low.")
+
+    try:
         prob, insights = predict_with_explanations(latest)
+    except Exception:
+        st.error("Prediction failed due to data issues.")
+        return
 
-        st.metric("Crisis Probability", f"{prob:.2%}")
-        st.write(f"Risk Level: **{risk_label(prob)}**")
+    st.metric("Crisis Probability", f"{prob:.2%}")
+    st.write(f"Risk Level: **{risk_label(prob)}**")
 
-        st.markdown("**Top Drivers (SHAP):**")
-        for txt in insights:
-            st.write(f"- {txt}")
+    st.markdown("**Top Drivers (SHAP):**")
+    for txt in insights:
+        st.write(f"- {txt}")
 
-        # =========================
-        # 🧠 EXECUTIVE INSIGHTS
-        # =========================
-        st.markdown("### Executive Insights")
+    # =========================
+    # 🧠 EXECUTIVE INSIGHTS
+    # =========================
+    st.markdown("### Executive Insights")
 
-        aligned = prepare_features(latest, model).iloc[[0]]
+    aligned = prepare_features(latest, model).iloc[[0]]
 
+    try:
         shap_vals = explainer.shap_values(aligned)
         if isinstance(shap_vals, list):
             shap_vals = shap_vals[1]
@@ -125,65 +138,75 @@ def main():
         for a in exec_insights["actions"]:
             st.write(a)
 
-        # =========================
-        # 🎯 SCENARIO SIMULATOR
-        # =========================
-        st.markdown("### Scenario Simulator")
+    except Exception:
+        st.warning("Executive insights unavailable.")
 
-        st.markdown("#### Economic Growth")
-        gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0, 0.5)
+    # =========================
+    # 🎯 SCENARIO SIMULATOR
+    # =========================
+    st.markdown("### Scenario Simulator")
 
-        st.markdown("#### Trade Dynamics")
-        imp_delta = st.slider("Imports change (%)", -20.0, 20.0, 0.0, 0.5)
-        exp_delta = st.slider("Exports change (%)", -20.0, 20.0, 0.0, 0.5)
+    gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0, 0.5)
+    imp_delta = st.slider("Imports change (%)", -20.0, 20.0, 0.0, 0.5)
+    exp_delta = st.slider("Exports change (%)", -20.0, 20.0, 0.0, 0.5)
+    rate_delta = st.slider("Interest rate change (bps)", -300.0, 300.0, 0.0, 25.0)
+    infl_delta = st.slider("Inflation change (pp)", -5.0, 5.0, 0.0, 0.25)
 
-        st.markdown("#### Monetary Conditions")
-        rate_delta = st.slider("Interest rate change (bps)", -300.0, 300.0, 0.0, 25.0)
-        infl_delta = st.slider("Inflation change (pp)", -5.0, 5.0, 0.0, 0.25)
+    sim_row = latest.copy()
 
-        sim_row = latest.copy()
+    # 🚨 SAFE CLEAN
+    sim_row = sim_row.fillna(sim_row.mean())
+    sim_row = sim_row.fillna(0)
 
-        # ✅ SMART fill (not zero)
-        sim_row = sim_row.fillna(sim_row.mean())
-
+    # Safe transformations
+    if "gdp_current_usd" in sim_row.columns:
         sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
+
+    if "imports_pct_gdp" in sim_row.columns:
         sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
+
+    if "exports_pct_gdp" in sim_row.columns:
         sim_row["exports_pct_gdp"] *= (1 + exp_delta / 100)
 
-        if "interest_rate_pct" in sim_row.columns:
-            sim_row["interest_rate_pct"] += rate_delta / 100
+    if "interest_rate_pct" in sim_row.columns:
+        sim_row["interest_rate_pct"] += rate_delta / 100
 
-        if "inflation_cpi_pct" in sim_row.columns:
-            sim_row["inflation_cpi_pct"] += infl_delta
+    if "inflation_cpi_pct" in sim_row.columns:
+        sim_row["inflation_cpi_pct"] += infl_delta
 
+    try:
         sim_prob, sim_insights = predict_with_explanations(sim_row)
+    except Exception:
+        st.error("Simulation failed.")
+        return
 
-        col1, col2 = st.columns(2)
-        col1.metric("Current Probability", f"{prob:.2%}")
-        col2.metric(
-            "Simulated Probability",
-            f"{sim_prob:.2%}",
-            delta=f"{sim_prob - prob:+.2%}",
-        )
+    col1, col2 = st.columns(2)
+    col1.metric("Current Probability", f"{prob:.2%}")
+    col2.metric(
+        "Simulated Probability",
+        f"{sim_prob:.2%}",
+        delta=f"{sim_prob - prob:+.2%}",
+    )
 
-        st.write(f"Simulated Risk Level: **{risk_label(sim_prob)}**")
+    st.write(f"Simulated Risk Level: **{risk_label(sim_prob)}**")
 
-        change = sim_prob - prob
+    change = sim_prob - prob
 
-        if change > 0.05:
-            st.error("Risk is significantly increasing under this scenario")
-        elif change < -0.05:
-            st.success("Risk is significantly decreasing under this scenario")
-        else:
-            st.info("Scenario has limited impact on risk")
+    if change > 0.05:
+        st.error("Risk significantly increasing")
+    elif change < -0.05:
+        st.success("Risk significantly decreasing")
+    else:
+        st.info("Limited impact scenario")
 
-        st.markdown("**Simulated Top Drivers:**")
-        for txt in sim_insights:
-            st.write(f"- {txt}")
+    st.markdown("**Simulated Top Drivers:**")
+    for txt in sim_insights:
+        st.write(f"- {txt}")
 
-        # =========================
-        # 🧠 SIMULATED INSIGHTS
-        # =========================
+    # =========================
+    # 🧠 SIMULATED INSIGHTS
+    # =========================
+    try:
         sim_aligned = prepare_features(sim_row, model).iloc[[0]]
 
         sim_shap_vals = explainer.shap_values(sim_aligned)
@@ -201,8 +224,8 @@ def main():
         for a in sim_exec["actions"]:
             st.write(a)
 
-    else:
-        st.info("No data available for this country.")
+    except Exception:
+        st.warning("Simulated insights unavailable.")
 
 
 if __name__ == "__main__":
