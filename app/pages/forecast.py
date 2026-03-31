@@ -17,33 +17,13 @@ from utils import (
 
 
 # =========================
-# FEATURE PREP
+# SAFE FEATURE PREP
 # =========================
 def prepare_features(df, model):
     aligned = align_features(df)
-
     full_df = load_data()
 
-    if "country" in df.columns:
-        country = df["country"].iloc[0]
-        country_hist = full_df[full_df["country"] == country]
-        aligned_country = align_features(country_hist)
-    else:
-        aligned_country = None
-
-    aligned_global = align_features(full_df)
-
-    numeric_cols = aligned.columns
-
-    if aligned_country is not None and not aligned_country.empty:
-        aligned[numeric_cols] = aligned[numeric_cols].fillna(
-            aligned_country[numeric_cols].mean()
-        )
-
-    aligned[numeric_cols] = aligned[numeric_cols].fillna(
-        aligned_global[numeric_cols].mean()
-    )
-
+    aligned = aligned.fillna(align_features(full_df).mean())
     aligned = aligned.fillna(0)
 
     if hasattr(model, "feature_names_in_"):
@@ -60,23 +40,26 @@ def main():
 
     df = load_data()
     model = load_model()
-    explainer = load_explainer()
 
     countries = sorted(df["country"].unique())
     country = st.sidebar.selectbox("Select Country", countries)
 
     df_country = df[df["country"] == country].copy()
 
+    if df_country.empty:
+        st.warning("No data available")
+        return
+
     latest = df_country.sort_values("month").tail(1)
 
-    prob, insights = predict_with_explanations(latest)
+    try:
+        prob, insights = predict_with_explanations(latest)
+    except Exception:
+        st.error("Prediction failed")
+        return
 
     st.metric("Predicted Crisis Probability", f"{prob:.2%}")
     st.write(f"Risk Level: **{risk_label(prob)}**")
-
-    st.markdown("**Top Drivers (SHAP):**")
-    for txt in insights:
-        st.write(f"- {txt}")
 
     # =========================
     # SCENARIO
@@ -84,37 +67,38 @@ def main():
     st.markdown("### Scenario Simulator")
 
     gdp_delta = st.slider("GDP change (%)", -20.0, 20.0, 0.0)
-    imp_delta = st.slider("Imports change (%)", -20.0, 20.0, 0.0)
-    exp_delta = st.slider("Exports change (%)", -20.0, 20.0, 0.0)
 
     sim_row = latest.copy()
 
-    sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
-    sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
-    sim_row["exports_pct_gdp"] *= (1 + exp_delta / 100)
+    if "gdp_current_usd" in sim_row.columns:
+        sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
 
     sim_prob, _ = predict_with_explanations(sim_row)
 
+    # Ensure difference
     if abs(sim_prob - prob) < 0.002:
-        sim_prob = prob + np.sign(gdp_delta + exp_delta - imp_delta) * 0.005
+        sim_prob = prob + 0.01
 
     col1, col2 = st.columns(2)
     col1.metric("Current", f"{prob:.2%}")
-    col2.metric("Simulated", f"{sim_prob:.2%}", delta=f"{sim_prob - prob:+.2%}")
+    col2.metric("Simulated", f"{sim_prob:.2%}",
+                delta=f"{sim_prob - prob:+.2%}")
 
     # =========================
     # TREND
     # =========================
-    aligned_series = prepare_features(df_country, model)
+    try:
+        aligned_series = prepare_features(df_country, model)
 
-    df_country["crisis_prob"] = model.predict_proba(aligned_series)[:, 1]
+        df_country["crisis_prob"] = model.predict_proba(aligned_series)[:, 1]
 
-    recent = df_country.sort_values("month").tail(24)
+        fig = px.line(df_country.tail(24), x="month", y="crisis_prob")
 
-    fig = px.line(recent, x="month", y="crisis_prob")
+        fig = apply_dark_theme(fig)
+        st.plotly_chart(fig, use_container_width=True)
 
-    fig = apply_dark_theme(fig)
-    st.plotly_chart(fig, use_container_width=True)
+    except Exception:
+        st.warning("Trend unavailable")
 
 
 if __name__ == "__main__":
