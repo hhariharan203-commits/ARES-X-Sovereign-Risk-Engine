@@ -4,11 +4,11 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
+import shap
 
-from utils import (
+from app.utils import (
     load_data,
     load_model,
-    load_explainer,
     add_probabilities,
     predict_with_explanations,
     generate_executive_insights,
@@ -16,6 +16,7 @@ from utils import (
     apply_dark_theme,
     risk_label,
 )
+
 
 # =========================
 # PREP FEATURES
@@ -43,12 +44,20 @@ def main():
             st.warning("No data available")
             return
 
+        # =========================
+        # VALIDATION
+        # =========================
+        if "country" not in df.columns:
+            st.error("Country column missing")
+            return
+
         df["month"] = pd.to_datetime(df["month"], errors="coerce")
 
         model = load_model()
-        explainer = load_explainer()
 
-        # ✅ SINGLE SOURCE OF TRUTH
+        # =========================
+        # PREDICTIONS
+        # =========================
         df = add_probabilities(df)
 
         countries = sorted(df["country"].dropna().unique())
@@ -67,43 +76,52 @@ def main():
         # =========================
         prob, insights = predict_with_explanations(latest)
 
-        st.metric("Crisis Probability", f"{prob:.2%}")
-        st.write(f"Risk Level: **{risk_label(prob)}**")
+        col1, col2 = st.columns(2)
 
-        st.markdown("**Top Drivers:**")
+        col1.metric("Crisis Probability", f"{prob:.2%}")
+        col2.metric("Risk Level", risk_label(prob))
+
+        st.markdown("### Key Drivers")
         for txt in insights:
             st.write(f"- {txt}")
 
         # =========================
-        # EXECUTIVE INSIGHTS
+        # EXECUTIVE INSIGHTS (SAFE)
         # =========================
-        aligned = prepare_features(latest, model).iloc[[0]]
+        try:
+            aligned = prepare_features(latest, model).iloc[[0]]
 
-        shap_vals = explainer.shap_values(aligned)
-        if isinstance(shap_vals, list):
-            shap_vals = shap_vals[1]
+            explainer = shap.TreeExplainer(model)
+            shap_vals = explainer.shap_values(aligned)
 
-        shap_vals = np.array(shap_vals)[0]
+            if isinstance(shap_vals, list):
+                shap_vals = shap_vals[1]
 
-        exec_insights = generate_executive_insights(aligned, shap_vals)
+            shap_vals = np.array(shap_vals)[0]
 
-        st.markdown("### Executive Insights")
-        st.write(exec_insights["summary"])
+            exec_insights = generate_executive_insights(aligned, shap_vals)
 
-        for d in exec_insights["drivers"]:
-            st.write(d)
+            st.markdown("### Executive Insights")
+            st.write(exec_insights["summary"])
+
+            st.markdown("**Drivers:**")
+            for d in exec_insights["drivers"]:
+                st.write(f"- {d}")
+
+        except Exception:
+            st.warning("Executive insights unavailable")
 
         # =========================
-        # SIMULATOR
+        # SIMULATOR (SAFE)
         # =========================
         st.markdown("---")
         st.subheader("Policy Simulator")
 
         col1, col2, col3 = st.columns(3)
 
-        delta_rate = col1.slider("Interest Rate Change", -5.0, 5.0, 0.0)
-        delta_infl = col2.slider("Inflation Change", -5.0, 5.0, 0.0)
-        delta_unemp = col3.slider("Unemployment Change", -5.0, 5.0, 0.0)
+        delta_rate = col1.slider("Interest Rate Δ", -5.0, 5.0, 0.0)
+        delta_infl = col2.slider("Inflation Δ", -5.0, 5.0, 0.0)
+        delta_unemp = col3.slider("Unemployment Δ", -5.0, 5.0, 0.0)
 
         sim_row = latest.copy()
 
@@ -116,26 +134,29 @@ def main():
         if "unemployment" in sim_row.columns:
             sim_row["unemployment"] += delta_unemp
 
-        sim_aligned = prepare_features(sim_row, model).iloc[[0]]
+        try:
+            sim_aligned = prepare_features(sim_row, model).iloc[[0]]
+            sim_prob = float(model.predict_proba(sim_aligned)[0, 1])
 
-        sim_prob = float(model.predict_proba(sim_aligned)[0, 1])
+            colA, colB = st.columns(2)
 
-        colA, colB = st.columns(2)
+            colA.metric("Current", f"{prob:.2%}")
+            colB.metric(
+                "Simulated",
+                f"{sim_prob:.2%}",
+                delta=f"{sim_prob - prob:+.2%}",
+            )
 
-        colA.metric("Current", f"{prob:.2%}")
-        colB.metric(
-            "Simulated",
-            f"{sim_prob:.2%}",
-            delta=f"{sim_prob - prob:+.2%}",
-        )
+            st.write(f"Simulated Risk: **{risk_label(sim_prob)}**")
 
-        st.write(f"Simulated Risk: **{risk_label(sim_prob)}**")
+        except Exception:
+            st.warning("Simulator unavailable")
 
         # =========================
         # TREND CHART
         # =========================
         st.markdown("---")
-        st.subheader("Economic Trend")
+        st.subheader("Economic Trends")
 
         plot_cols = [
             "gdp_growth",
