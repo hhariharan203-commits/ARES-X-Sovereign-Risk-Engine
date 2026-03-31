@@ -3,7 +3,7 @@ from __future__ import annotations
 import streamlit as st
 
 # IMPORTANT: absolute import
-from app.utils import load_data, load_model
+from utils import load_data, load_model
 
 
 # =========================
