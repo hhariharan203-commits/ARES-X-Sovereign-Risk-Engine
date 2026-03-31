@@ -1,104 +1,115 @@
-﻿import pandas as pd
+import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import apply_dark_theme, load_data, add_probabilities, assign_risk_levels
-
-
-def safe_load():
-    try:
-        df = load_data()
-        df.columns = df.columns.str.strip().str.lower()
-        return df
-    except Exception as e:
-        st.error(f"Failed to load data: {e}")
-        st.stop()
+from utils import apply_dark_theme, load_data, add_probabilities
 
 
 def main():
-    try:
-        st.title("Global Risk Overview")
+    st.title("Global Risk Overview")
 
-        df = safe_load()
+    try:
+        df = load_data()
+
         if df.empty:
             st.warning("No data available")
             return
 
-        if "month" in df.columns:
-            df["month"] = pd.to_datetime(df["month"], errors="coerce")
-        else:
-            st.warning("Month column missing")
-            return
+        # Ensure datetime
+        df["month"] = pd.to_datetime(df["month"], errors="coerce")
 
-        if "crisis_prob" not in df.columns:
-            df = add_probabilities(df)
+        # ALWAYS recompute predictions (single source of truth)
+        df = add_probabilities(df)
 
+        # Latest snapshot
         latest_month = df["month"].max()
-        latest_df = df[df["month"] == latest_month]
+        latest_df = df[df["month"] == latest_month].copy()
 
         if latest_df.empty:
-            st.warning("No recent data available")
+            st.warning("No latest data available")
             return
 
-        if "risk_level" not in df.columns and "crisis_prob" in df.columns:
-            df["risk_level"] = assign_risk_levels(df["crisis_prob"])
-        if "risk_level" not in latest_df.columns and "crisis_prob" in latest_df.columns:
-            latest_df["risk_level"] = assign_risk_levels(latest_df["crisis_prob"])
+        # =========================
+        # TABLE
+        # =========================
+        st.subheader("Latest Risk by Country")
 
-        if {"country", "crisis_prob"} <= set(latest_df.columns):
-            table = latest_df[["country", "crisis_prob", "risk_level"]].sort_values("crisis_prob", ascending=False)
-            st.subheader("Latest Risk by Country")
-            st.dataframe(table)
-        else:
-            st.warning("Risk data not available")
+        table = latest_df[
+            ["country", "crisis_prob", "risk_level"]
+        ].sort_values("crisis_prob", ascending=False)
 
-        if "risk_level" in df.columns:
-            risk_counts = df["risk_level"].value_counts()
-            if not risk_counts.empty:
-                fig = px.pie(
-                    names=risk_counts.index,
-                    values=risk_counts.values,
-                    title="Risk Distribution (All Time)"
-                )
-                fig = apply_dark_theme(fig)
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("Risk level data not available")
-        else:
-            st.warning("Risk level column missing")
+        st.dataframe(
+            table.style.format({"crisis_prob": "{:.2%}"}),
+            use_container_width=True,
+        )
 
-        if "crisis_prob" in latest_df.columns and "country" in latest_df.columns:
-            top5 = latest_df.sort_values("crisis_prob", ascending=False).head(5)
-            st.subheader("Top 5 Highest Risk Countries")
-            st.table(top5[["country", "crisis_prob"]])
+        # =========================
+        # RISK DISTRIBUTION
+        # =========================
+        st.subheader("Risk Distribution")
 
-        if {"country", "crisis_prob"} <= set(latest_df.columns):
-            fig = px.choropleth(
-                latest_df,
-                locations="country",
-                locationmode="ISO-3",
-                color="crisis_prob",
-                hover_name="country",
-                color_continuous_scale=[
-                    [0, "green"],
-                    [0.5, "yellow"],
-                    [1, "red"]
-                ],
-                title="Global Crisis Probability (Latest Month)"
-            )
-            fig.update_layout(
-                geo=dict(
-                    bgcolor="#0e1117",
-                    lakecolor="#0e1117",
-                    landcolor="#1a1a1a"
-                )
-            )
-            fig = apply_dark_theme(fig)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Insufficient data for map view")
+        risk_counts = latest_df["risk_level"].value_counts()
+
+        fig_pie = px.pie(
+            names=risk_counts.index,
+            values=risk_counts.values,
+            title="Risk Distribution (Latest Month)",
+        )
+
+        fig_pie = apply_dark_theme(fig_pie)
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # =========================
+        # TOP 5 COUNTRIES
+        # =========================
+        st.subheader("Top 5 Highest Risk Countries")
+
+        top5 = latest_df.sort_values("crisis_prob", ascending=False).head(5)
+
+        fig_bar = px.bar(
+            top5,
+            x="crisis_prob",
+            y="country",
+            orientation="h",
+            text=top5["crisis_prob"].map(lambda x: f"{x:.1%}"),
+            title="Top Risk Countries",
+        )
+
+        fig_bar = apply_dark_theme(fig_bar)
+        fig_bar.update_layout(xaxis_tickformat=".0%")
+
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # =========================
+        # GLOBAL MAP
+        # =========================
+        st.subheader("Global Risk Map")
+
+        fig_map = px.choropleth(
+            latest_df,
+            locations="country",
+            locationmode="ISO-3",
+            color="crisis_prob",
+            hover_name="country",
+            color_continuous_scale=[
+                [0, "green"],
+                [0.5, "yellow"],
+                [1, "red"],
+            ],
+            title="Global Crisis Probability",
+        )
+
+        fig_map.update_layout(
+            geo=dict(bgcolor="#0e1117"),
+            coloraxis_showscale=False,
+        )
+
+        fig_map = apply_dark_theme(fig_map)
+
+        st.plotly_chart(fig_map, use_container_width=True)
+
     except Exception as e:
-        st.warning(f"Safe fallback: {e}")
+        st.error(f"Error: {e}")
 
 
 if __name__ == "__main__":
