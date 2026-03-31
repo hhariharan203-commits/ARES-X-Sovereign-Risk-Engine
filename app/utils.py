@@ -65,7 +65,7 @@ def align_features(df: pd.DataFrame) -> pd.DataFrame:
 
     df_aligned = df.reindex(columns=cols)
 
-    # ✅ FORCE NUMERIC ONLY (CRITICAL FIX)
+    # ✅ CRITICAL: enforce numeric
     df_aligned = df_aligned.apply(pd.to_numeric, errors="coerce")
 
     return df_aligned[cols]
@@ -86,23 +86,41 @@ def predict_with_explanations(df_row: pd.DataFrame):
     explainer = load_explainer()
 
     # =========================
+    # LOAD DATA
+    # =========================
+    full_df = load_data()
+    country = df_row["country"].iloc[0]
+
+    country_hist = full_df[full_df["country"] == country]
+    global_hist = full_df.copy()
+
+    # =========================
     # ALIGN FEATURES
     # =========================
     aligned = align_features(df_row).iloc[[0]]
+    aligned_country = align_features(country_hist)
+    aligned_global = align_features(global_hist)
+
+    numeric_cols = aligned.columns
 
     # =========================
-    # HANDLE NUMERIC SAFELY
+    # 🔥 HYBRID IMPUTATION (FINAL)
     # =========================
-    numeric_cols = aligned.select_dtypes(include=[np.number]).columns
-
+    # 1. Country mean
     aligned[numeric_cols] = aligned[numeric_cols].fillna(
-        aligned[numeric_cols].mean()
+        aligned_country[numeric_cols].mean()
     )
 
+    # 2. Global mean fallback
+    aligned[numeric_cols] = aligned[numeric_cols].fillna(
+        aligned_global[numeric_cols].mean()
+    )
+
+    # 3. Final fallback
     aligned = aligned.fillna(0)
 
     # =========================
-    # MATCH MODEL FEATURES
+    # MODEL ALIGNMENT
     # =========================
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -116,7 +134,7 @@ def predict_with_explanations(df_row: pd.DataFrame):
         return 0.25, ["Data issue — fallback prediction"]
 
     # =========================
-    # MODEL PREDICTION
+    # PREDICTION
     # =========================
     try:
         prob = float(model.predict_proba(aligned)[0, 1])
@@ -124,7 +142,7 @@ def predict_with_explanations(df_row: pd.DataFrame):
         return 0.25, ["Model failed — fallback prediction"]
 
     # =========================
-    # SHAP EXPLANATIONS
+    # SHAP EXPLANATION
     # =========================
     try:
         shap_values = explainer.shap_values(aligned)
@@ -146,6 +164,12 @@ def predict_with_explanations(df_row: pd.DataFrame):
 
     except Exception:
         insights = ["Explainability unavailable"]
+
+    # =========================
+    # LOW VARIANCE WARNING
+    # =========================
+    if aligned.std(axis=1).values[0] < 1e-5:
+        insights.append("⚠️ Low data variability — low confidence")
 
     return prob, insights
 
@@ -188,20 +212,20 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
             seen_groups.add(group)
 
             if group == "Interest Rates":
-                actions.append("Review central bank rate policy to control inflation")
+                actions.append("Review central bank rate policy")
             elif group == "Export Strength":
-                actions.append("Enhance export competitiveness through trade incentives")
+                actions.append("Boost export competitiveness")
             elif group == "Import Dependency":
-                actions.append("Reduce import dependency via domestic production")
+                actions.append("Reduce import reliance")
             elif group == "Economic Growth":
-                actions.append("Deploy fiscal stimulus to support economic growth")
+                actions.append("Deploy fiscal stimulus")
             elif group == "Labor Market":
-                actions.append("Strengthen labor market through job creation programs")
+                actions.append("Improve employment programs")
 
         if len(drivers) == 3:
             break
 
-    summary = drivers[0].replace("- ", "").capitalize() if drivers else "Overall risk remains stable"
+    summary = drivers[0].replace("- ", "").capitalize() if drivers else "Risk stable"
 
     return {
         "summary": summary,
@@ -210,7 +234,7 @@ def generate_executive_insights(aligned: pd.DataFrame, shap_values) -> dict:
     }
 
 
-# ================= UI HELPERS =================
+# ================= UI =================
 def apply_dark_theme(fig):
     fig.update_layout(
         template="plotly_dark",
@@ -221,7 +245,7 @@ def apply_dark_theme(fig):
     return fig
 
 
-# ================= SHAP LOADER =================
+# ================= SHAP =================
 @lru_cache(maxsize=1)
 def load_shap():
     shap_path = BASE_DIR / "outputs" / "shap_importance.csv"
