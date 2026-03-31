@@ -1,10 +1,19 @@
+import sys
+import os
+
+CURRENT_DIR = os.path.dirname(__file__)
+APP_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
+
 import numpy as np
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 import shap
 
-from app.utils import (
+from utils import (
     load_data,
     load_model,
     add_probabilities,
