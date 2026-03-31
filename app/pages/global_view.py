@@ -1,8 +1,17 @@
+import sys
+import os
+
+CURRENT_DIR = os.path.dirname(__file__)
+APP_DIR = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+
+if APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
+    
 import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.utils import apply_dark_theme, load_data, add_probabilities
+from utils import apply_dark_theme, load_data, add_probabilities
 
 
 def main():
