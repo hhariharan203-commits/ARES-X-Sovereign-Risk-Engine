@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from utils import apply_dark_theme, load_data, add_probabilities
+from app.utils import apply_dark_theme, load_data, add_probabilities
 
 
 def main():
