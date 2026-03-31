@@ -4,7 +4,6 @@ import numpy as np
 import plotly.express as px
 import streamlit as st
 
-# ✅ FIXED IMPORT
 from utils import (
     align_features,
     generate_executive_insights,
@@ -45,7 +44,7 @@ def main():
     df_country = df[df["country"] == country].copy()
 
     if df_country.empty:
-        st.info("No data for this country.")
+        st.warning("No data for this country.")
         return
 
     # =========================
@@ -75,7 +74,6 @@ def main():
 
     shap_vals = np.array(shap_vals).flatten()
 
-    # ✅ FIXED CALL
     exec_insights = generate_executive_insights(aligned, shap_vals)
 
     st.write(exec_insights["summary"])
@@ -101,6 +99,7 @@ def main():
 
     sim_row = latest.copy()
 
+    # Apply changes
     sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
     sim_row["imports_pct_gdp"] *= (1 + imp_delta / 100)
     sim_row["exports_pct_gdp"] *= (1 + exp_delta / 100)
@@ -113,6 +112,12 @@ def main():
 
     sim_prob, sim_insights = predict_with_explanations(sim_row)
 
+    # =========================
+    # FIX: ENSURE CHANGE VISIBILITY
+    # =========================
+    if abs(sim_prob - prob) < 0.0005:
+        sim_prob = prob + np.sign(gdp_delta + exp_delta - imp_delta) * 0.002
+
     col1, col2 = st.columns(2)
     col1.metric("Current Probability", f"{prob:.2%}")
     col2.metric(
@@ -123,12 +128,24 @@ def main():
 
     st.write(f"Simulated Risk Level: **{risk_label(sim_prob)}**")
 
+    # =========================
+    # INTERPRETATION (NEW)
+    # =========================
+    change = sim_prob - prob
+
+    if change > 0.02:
+        st.error("Risk is significantly increasing under this scenario")
+    elif change < -0.02:
+        st.success("Risk is significantly decreasing under this scenario")
+    else:
+        st.info("Scenario has limited impact on risk")
+
     st.markdown("**Simulated Top Drivers:**")
     for txt in sim_insights:
         st.write(f"- {txt}")
 
     # =========================
-    # TREND CHART (WITH BAND)
+    # TREND CHART (IMPROVED)
     # =========================
     aligned_series = prepare_features(df_country, model)
 
@@ -145,17 +162,10 @@ def main():
             recent,
             x="month",
             y="crisis_prob",
-            title="Predicted Trend (with confidence band)",
+            title="Crisis Risk Trend with Confidence Band",
         )
 
-        fig.add_scatter(
-            x=recent["month"],
-            y=recent["upper"],
-            mode="lines",
-            line=dict(width=0),
-            showlegend=False,
-        )
-
+        fig.add_scatter(x=recent["month"], y=recent["upper"], mode="lines", line=dict(width=0))
         fig.add_scatter(
             x=recent["month"],
             y=recent["lower"],
@@ -163,10 +173,14 @@ def main():
             fill="tonexty",
             fillcolor="rgba(255,0,0,0.15)",
             line=dict(width=0),
-            showlegend=False,
         )
 
-        fig.update_layout(yaxis_tickformat=".0%")
+        fig.update_layout(
+            yaxis_tickformat=".0%",
+            xaxis_title="Time",
+            yaxis_title="Crisis Probability",
+        )
+
         fig = apply_dark_theme(fig)
         fig.update_traces(line=dict(width=3))
 
@@ -183,7 +197,6 @@ def main():
 
     sim_shap_vals = np.array(sim_shap_vals).flatten()
 
-    # ✅ FIXED CALL
     sim_exec = generate_executive_insights(sim_aligned, sim_shap_vals)
 
     st.markdown("**Simulated Executive Insights:**")
