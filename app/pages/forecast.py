@@ -17,10 +17,13 @@ from utils import (
 
 
 # =========================
-# SAFE FEATURE PREP
+# SAFE FEATURE PREP (FIXED)
 # =========================
 def prepare_features(df, model):
-    aligned = align_features(df).fillna(0)
+    aligned = align_features(df)
+
+    # ✅ SMART fill (NOT ZERO)
+    aligned = aligned.fillna(aligned.mean())
 
     if hasattr(model, "feature_names_in_"):
         aligned = aligned.reindex(columns=model.feature_names_in_, fill_value=0)
@@ -87,7 +90,7 @@ def main():
         st.write(a)
 
     # =========================
-    # SCENARIO SIMULATOR
+    # SCENARIO SIMULATOR (FIXED)
     # =========================
     st.markdown("### Scenario Simulator")
 
@@ -98,6 +101,9 @@ def main():
     infl_delta = st.slider("Inflation change (pp)", -5.0, 5.0, 0.0, 0.25)
 
     sim_row = latest.copy()
+
+    # ✅ CLEAN DATA BEFORE SIMULATION
+    sim_row = sim_row.fillna(sim_row.mean())
 
     # Apply changes
     sim_row["gdp_current_usd"] *= (1 + gdp_delta / 100)
@@ -112,12 +118,6 @@ def main():
 
     sim_prob, sim_insights = predict_with_explanations(sim_row)
 
-    # =========================
-    # FIX: ENSURE CHANGE VISIBILITY
-    # =========================
-    if abs(sim_prob - prob) < 0.0005:
-        sim_prob = prob + np.sign(gdp_delta + exp_delta - imp_delta) * 0.002
-
     col1, col2 = st.columns(2)
     col1.metric("Current Probability", f"{prob:.2%}")
     col2.metric(
@@ -129,13 +129,13 @@ def main():
     st.write(f"Simulated Risk Level: **{risk_label(sim_prob)}**")
 
     # =========================
-    # INTERPRETATION (NEW)
+    # INTERPRETATION
     # =========================
     change = sim_prob - prob
 
-    if change > 0.02:
+    if change > 0.05:
         st.error("Risk is significantly increasing under this scenario")
-    elif change < -0.02:
+    elif change < -0.05:
         st.success("Risk is significantly decreasing under this scenario")
     else:
         st.info("Scenario has limited impact on risk")
@@ -145,7 +145,7 @@ def main():
         st.write(f"- {txt}")
 
     # =========================
-    # TREND CHART (IMPROVED)
+    # TREND CHART
     # =========================
     aligned_series = prepare_features(df_country, model)
 
@@ -175,11 +175,7 @@ def main():
             line=dict(width=0),
         )
 
-        fig.update_layout(
-            yaxis_tickformat=".0%",
-            xaxis_title="Time",
-            yaxis_title="Crisis Probability",
-        )
+        fig.update_layout(yaxis_tickformat=".0%")
 
         fig = apply_dark_theme(fig)
         fig.update_traces(line=dict(width=3))
