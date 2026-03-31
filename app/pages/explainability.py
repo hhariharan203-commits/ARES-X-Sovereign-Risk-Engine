@@ -3,7 +3,8 @@ from __future__ import annotations
 import plotly.express as px
 import streamlit as st
 
-from utils import load_shap, humanize_feature, apply_dark_theme
+from utils import load_shap, humanize_feature, apply_dark_theme, load_model, load_feature_cols
+import pandas as pd
 
 
 def main():
@@ -15,8 +16,18 @@ def main():
     # SAFETY CHECKS
     # =========================
     if shap_imp.empty:
-        st.warning("No SHAP importance data available.")
-        return
+        # fallback to model feature importance if available
+        model = load_model()
+        if hasattr(model, "feature_importances_"):
+            feats = load_feature_cols()
+            shap_imp = pd.DataFrame(
+                {"feature": feats[: len(model.feature_importances_)], "mean_abs_shap": model.feature_importances_}
+            )
+        else:
+            st.warning("No SHAP or feature importance data available.")
+            return
+
+    shap_imp.columns = shap_imp.columns.str.strip().str.lower()
 
     required_cols = {"feature", "mean_abs_shap"}
     if not required_cols.issubset(set(shap_imp.columns)):
