@@ -4,7 +4,6 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# ✅ FIXED IMPORT
 from utils import (
     align_features,
     load_data,
@@ -30,21 +29,22 @@ def latest_predictions(df: pd.DataFrame, model) -> pd.DataFrame:
     probs = model.predict_proba(aligned)[:, 1]
 
     latest["crisis_prob"] = probs
-    latest["risk_level"] = [risk_label(p) for p in probs]
+    latest["risk_level"] = latest["crisis_prob"].apply(risk_label)
 
     return latest.sort_values("crisis_prob", ascending=False)
 
 
 # =========================
-# ALERTS
+# ALERT SYSTEM (IMPROVED)
 # =========================
 def compute_alerts(df: pd.DataFrame, model):
     records = []
 
     for country, g in df.sort_values("month").groupby("country"):
-        tail = g.tail(2)
-        if len(tail) < 1:
+        if len(g) < 2:
             continue
+
+        tail = g.tail(2)
 
         aligned = align_features(tail).fillna(0)
 
@@ -55,31 +55,24 @@ def compute_alerts(df: pd.DataFrame, model):
 
         probs = model.predict_proba(aligned)[:, 1]
 
-        if len(probs) == 1:
-            latest_prob, prev_prob = probs[0], None
-        else:
-            prev_prob, latest_prob = probs[-2], probs[-1]
-
-        change = None if prev_prob is None else latest_prob - prev_prob
+        prev, latest = probs[-2], probs[-1]
+        change = latest - prev
 
         records.append({
             "country": country,
-            "latest_prob": latest_prob,
-            "prev_prob": prev_prob,
+            "latest_prob": latest,
             "change": change,
         })
 
     alert_df = pd.DataFrame(records)
 
     if alert_df.empty:
-        return None, None, None
+        return [], []
 
-    top_risk = alert_df.sort_values("latest_prob", ascending=False).iloc[0]
+    rising = alert_df.sort_values("change", ascending=False).head(3)
+    easing = alert_df.sort_values("change", ascending=True).head(3)
 
-    inc_df = alert_df.dropna(subset=["change"]).sort_values("change", ascending=False)
-    top_increase = inc_df.iloc[0] if not inc_df.empty else None
-
-    return alert_df, top_risk, top_increase
+    return rising.to_dict("records"), easing.to_dict("records")
 
 
 # =========================
@@ -92,38 +85,52 @@ def main():
     model = load_model()
 
     pred_df = latest_predictions(df, model)
-    alert_df, top_risk, top_increase = compute_alerts(df, model)
+    rising, easing = compute_alerts(df, model)
 
     # =========================
-    # ALERTS
+    # KPI SUMMARY
     # =========================
-    if top_risk is not None:
-        st.warning(
-            f"Top Risk: **{top_risk['country']}** at {top_risk['latest_prob']:.1%}",
-            icon="⚠️",
-        )
+    total = pred_df["country"].nunique()
+    high = (pred_df["risk_level"] == "HIGH").sum()
+    avg = pred_df["crisis_prob"].mean()
+    top = pred_df.iloc[0]
 
-    if top_increase is not None and top_increase["change"] > 0:
-        st.error(
-            f"Rising Risk: **{top_increase['country']}** increased by {top_increase['change']:.1%}",
-            icon="⬆️",
-        )
-
-    # =========================
-    # TABLE
-    # =========================
-    st.subheader("Latest Risk by Country")
-
-    st.dataframe(
-        pred_df[["country", "crisis_prob", "risk_level"]]
-        .style.format({"crisis_prob": "{:.2%}"}),
-        use_container_width=True,
-    )
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Countries Covered", total)
+    col2.metric("High Risk Countries", high)
+    col3.metric("Avg Risk", f"{avg:.2%}")
+    col4.metric("Top Risk", top["country"], f"{top['crisis_prob']:.1%}")
 
     # =========================
-    # TOP 5 BAR
+    # STRATEGIC ALERTS
     # =========================
-    st.subheader("Top 5 Most Risky Countries")
+    st.subheader("Strategic Risk Signals")
+
+    st.markdown("**Rising Risk (Top 3):**")
+    for r in rising:
+        st.write(f"- {r['country']} ↑ {r['change']:.2%}")
+
+    st.markdown("**Easing Risk (Top 3):**")
+    for r in easing:
+        st.write(f"- {r['country']} ↓ {abs(r['change']):.2%}")
+
+    # =========================
+    # DISTRIBUTION
+    # =========================
+    st.subheader("Risk Distribution")
+
+    dist = pred_df["risk_level"].value_counts().reset_index()
+    dist.columns = ["risk_level", "count"]
+
+    fig_dist = px.bar(dist, x="risk_level", y="count")
+    fig_dist = apply_dark_theme(fig_dist)
+
+    st.plotly_chart(fig_dist, use_container_width=True)
+
+    # =========================
+    # TOP 5 COUNTRIES
+    # =========================
+    st.subheader("Top 5 Risk Countries")
 
     top5 = pred_df.head(5)
 
@@ -135,20 +142,15 @@ def main():
         text=top5["crisis_prob"].map(lambda x: f"{x:.1%}"),
         color="crisis_prob",
         color_continuous_scale=["green", "orange", "red"],
-        title="Top 5 Crisis Probabilities",
     )
 
     fig = apply_dark_theme(fig)
-
-    fig.update_layout(
-        xaxis_tickformat=".0%",
-        coloraxis_showscale=False,
-    )
+    fig.update_layout(xaxis_tickformat=".0%")
 
     st.plotly_chart(fig, use_container_width=True)
 
     # =========================
-    # HEATMAP
+    # GLOBAL HEATMAP
     # =========================
     st.subheader("Global Risk Heatmap")
 
@@ -158,16 +160,25 @@ def main():
         locationmode="ISO-3",
         color="crisis_prob",
         color_continuous_scale=[[0, "green"], [0.5, "yellow"], [1, "red"]],
-        title="Global Crisis Probability",
     )
 
     fig_map = apply_dark_theme(fig_map)
-
-    fig_map.update_layout(
-        geo=dict(bgcolor="#0e1117"),
-    )
+    fig_map.update_layout(geo=dict(bgcolor="#0e1117"))
 
     st.plotly_chart(fig_map, use_container_width=True)
+
+    # =========================
+    # EXECUTIVE SUMMARY (NEW 🔥)
+    # =========================
+    st.subheader("Executive Summary")
+
+    summary = (
+        f"Global risk average stands at {avg:.1%}. "
+        f"{high} countries are currently in HIGH risk zone. "
+        f"Highest exposure observed in {top['country']} ({top['crisis_prob']:.1%})."
+    )
+
+    st.write(summary)
 
     # =========================
     # FULL TABLE
@@ -175,7 +186,8 @@ def main():
     st.subheader("Full Country Table")
 
     st.dataframe(
-        pred_df.sort_values("crisis_prob", ascending=False)
+        pred_df[["country", "crisis_prob", "risk_level"]]
+        .sort_values("crisis_prob", ascending=False)
         .style.format({"crisis_prob": "{:.2%}"}),
         use_container_width=True,
     )
