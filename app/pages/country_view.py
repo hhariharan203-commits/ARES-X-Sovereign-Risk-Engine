@@ -6,7 +6,7 @@ import plotly.express as px
 import streamlit as st
 import shap
 
-from app.utils import (
+from utils import (
     load_data,
     load_model,
     add_probabilities,
