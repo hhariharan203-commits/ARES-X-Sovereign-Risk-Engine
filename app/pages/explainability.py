@@ -1,14 +1,8 @@
-from __future__ import annotations
-
-import sys
-import os
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 import plotly.express as px
 import streamlit as st
 import pandas as pd
 
-from utils import (
+from app.utils import (
     load_shap,
     humanize_feature,
     apply_dark_theme,
