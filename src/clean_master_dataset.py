@@ -1,146 +1,196 @@
 from __future__ import annotations
-
 from pathlib import Path
-
 import pandas as pd
+import numpy as np
 
+# ─────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent.parent
+DATA_PATH = BASE_DIR / "data" / "master_dataset.csv"
+OUT_PATH  = BASE_DIR / "data" / "clean_master_dataset.csv"
 
-# Paths relative to the src directory so the script can be run from inside src
-DATA_PATH = (Path(__file__).resolve().parent / "../data/master_dataset.csv").resolve()
-OUT_PATH = (Path(__file__).resolve().parent / "../data/clean_master_dataset.csv").resolve()
+# ─────────────────────────────────────────────
+# CONFIG
+# ─────────────────────────────────────────────
+COUNTRY_MAP = {"US":"USA","IN":"IND","BR":"BRA","UK":"GBR","CN":"CHN"}
 
-# Mapping of possible short country codes to ISO3
-COUNTRY_MAP = {
-    "US": "USA",
-    "IN": "IND",
-    "BR": "BRA",
-    "UK": "GBR",
-    "CN": "CHN",
+COLUMN_RENAMES = {
+    "inflation_cpi_pct":  "inflation",
+    "unemployment_pct":   "unemployment",
+    "gdp_current_usd":    "gdp_growth",
+    "exports_pct_gdp":    "exports",
+    "imports_pct_gdp":    "imports",
 }
 
+BASE_COLS = ["gdp_growth", "inflation", "unemployment", "interest_rate"]
 
-def load_dataset(path: Path) -> pd.DataFrame:
+# ─────────────────────────────────────────────
+# LOAD
+# ─────────────────────────────────────────────
+def load_dataset(path):
     if not path.exists():
-        raise FileNotFoundError(f"Dataset not found at {path}")
+        raise FileNotFoundError(f"Dataset not found: {path}")
     df = pd.read_csv(path)
-    print("===== BASIC INFO =====")
-    print(f"Shape: {df.shape}")
-    print(f"Columns: {df.columns.tolist()}")
+    print(f"Loaded: {df.shape}")
     return df
 
-
-def fix_dates(df: pd.DataFrame) -> pd.DataFrame:
-    print("\nFixing month format...")
+# ─────────────────────────────────────────────
+# CLEANING
+# ─────────────────────────────────────────────
+def fix_dates(df):
     df = df.copy()
     df["month"] = pd.to_datetime(df["month"], errors="coerce")
-    invalid_dates = df["month"].isna().sum()
-    print(f"Invalid month rows: {invalid_dates}")
-    if invalid_dates:
-        df = df.dropna(subset=["month"])
-        print(f"Dropped {invalid_dates} rows with invalid months.")
-    # Normalize to month start (monthly frequency)
-    df["month"] = df["month"].dt.to_period("M").dt.to_timestamp()
+    df = df.dropna(subset=["month"])
+    df["year"]  = df["month"].dt.year
+    df["month"] = df["month"].dt.month
     return df
 
-
-def standardize_country(df: pd.DataFrame) -> pd.DataFrame:
-    print("\nFixing country codes...")
+def standardize_country(df):
     df = df.copy()
     df["country"] = df["country"].replace(COUNTRY_MAP)
-    print(f"Unique countries: {df['country'].nunique()}")
     return df
 
+def rename_columns(df):
+    return df.rename(columns=COLUMN_RENAMES)
 
-def drop_duplicates(df: pd.DataFrame) -> pd.DataFrame:
-    print("\nChecking duplicates...")
+def remove_duplicates(df):
+    return df.drop_duplicates(subset=["country","year","month"])
+
+def force_numeric(df):
     df = df.copy()
-    duplicates = df.duplicated(subset=["country", "month"]).sum()
-    print(f"Duplicate rows: {duplicates}")
-    if duplicates:
-        df = df.drop_duplicates(subset=["country", "month"])
-        print("Duplicates removed.")
+
+    # 🔥 Remove duplicate columns
+    df = df.loc[:, ~df.columns.duplicated()]
+
+    for col in df.columns:
+        if col == "country":
+            continue
+
+        # 🔥 If column is accidentally a DataFrame → fix it
+        if isinstance(df[col], pd.DataFrame):
+            df[col] = df[col].iloc[:, 0]
+
+        df[col] = pd.to_numeric(df[col], errors="coerce")
+
     return df
 
-
-def drop_sparse_columns(df: pd.DataFrame, threshold_ratio: float = 0.6) -> pd.DataFrame:
-    print("\nMissing values per column:")
-    missing = df.isna().sum()
-    print(missing)
-    threshold = len(df) * threshold_ratio
-    drop_cols = missing[missing > threshold].index.tolist()
-    if drop_cols:
-        print(f"\nDropping columns with >{int(threshold_ratio*100)}% missing: {drop_cols}")
-        df = df.drop(columns=drop_cols)
-    return df
-
-
-def interpolate_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """Interpolate and forward-fill numeric columns within each country."""
-    numeric_cols = [c for c in df.columns if c not in {"country", "month"}]
-    if not numeric_cols:
-        return df
+def fill_missing(df):
     df = df.copy()
-    df[numeric_cols] = (
-        df.groupby("country")[numeric_cols]
-        .apply(lambda g: g.interpolate().ffill())
-        .reset_index(level=0, drop=True)
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    df[numeric_cols] = df.groupby("country")[numeric_cols].transform(
+        lambda x: x.interpolate().ffill().bfill()
     )
+    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
     return df
 
-
-def add_scaling(df: pd.DataFrame) -> pd.DataFrame:
-    numeric_cols = [c for c in df.columns if c not in {"country", "month"}]
+def add_interest_rate(df):
     df = df.copy()
-    for col in numeric_cols:
-        mean = df[col].mean()
-        std = df[col].std() if df[col].std() else 1
-        df[f"{col}_z"] = (df[col] - mean) / std
+    if "interest_rate" not in df.columns:
+        if "inflation" in df.columns:
+            df["interest_rate"] = df["inflation"] + 2
+        else:
+            df["interest_rate"] = 5.0
     return df
 
+# ─────────────────────────────────────────────
+# FEATURE ENGINEERING (MATCH TRAIN MODEL)
+# ─────────────────────────────────────────────
+def add_lag_features(df):
+    df = df.sort_values(["country","year","month"]).copy()
 
-def summarize(df: pd.DataFrame) -> None:
-    print("\n===== SUMMARY =====")
-    print(f"Shape: {df.shape}")
-    print(f"Countries ({df['country'].nunique()}): {sorted(df['country'].unique())}")
-    print(f"Date range: {df['month'].min()} to {df['month'].max()}")
-    print("\nRemaining missing values per column:")
-    print(df.isna().sum())
-    print("\nSample rows:")
-    print(df.head(10))
+    for col in BASE_COLS:
+        if col in df.columns:
+            for lag in [1,3,6]:
+                df[f"{col}_lag{lag}"] = df.groupby("country")[col].shift(lag)
 
+    return df
 
-def main() -> None:
-    print("Script started")
+def add_rolling_features(df):
+    df = df.copy()
+
+    for col in BASE_COLS:
+        if col in df.columns:
+            df[f"{col}_roll3"] = df.groupby("country")[col].rolling(3).mean().reset_index(0, drop=True)
+            df[f"{col}_roll6"] = df.groupby("country")[col].rolling(6).mean().reset_index(0, drop=True)
+
+    return df
+
+def add_momentum(df):
+    df = df.copy()
+
+    for col in BASE_COLS:
+        if col in df.columns:
+            df[f"{col}_momentum"] = df[col] - df.groupby("country")[col].shift(3)
+
+    return df
+
+def add_stress_index(df):
+    df = df.copy()
+
+    if set(BASE_COLS).issubset(df.columns):
+        df["stress_index"] = (
+            df["inflation"] * 0.4 +
+            df["unemployment"] * 0.3 -
+            df["gdp_growth"] * 0.3
+        )
+
+    return df
+
+# ─────────────────────────────────────────────
+# LABEL
+# ─────────────────────────────────────────────
+def create_risk_label(df):
+    df = df.copy()
+
+    conditions = [
+        df["inflation"] > 7,
+        df["gdp_growth"] < 0,
+        df["unemployment"] > 10,
+        df["interest_rate"] > 8,
+    ]
+
+    stress = sum(c.astype(int) for c in conditions)
+    df["risk_label"] = (stress >= 2).astype(int)
+
+    print("Risk distribution:")
+    print(df["risk_label"].value_counts())
+
+    return df
+
+# ─────────────────────────────────────────────
+# MAIN PIPELINE
+# ─────────────────────────────────────────────
+def main():
     df = load_dataset(DATA_PATH)
-
-    # Ensure required columns exist
-    if "country" not in df.columns:
-        raise KeyError("Missing country column")
-
-    # Post-load shape
-    print(f"Loaded dataset shape: {df.shape}")
 
     df = fix_dates(df)
     df = standardize_country(df)
-    df = drop_duplicates(df)
-    df = df.sort_values(by=["country", "month"]).reset_index(drop=True)
-    df = drop_sparse_columns(df, threshold_ratio=0.6)
-    df = interpolate_numeric(df)
-    df = add_scaling(df)
+    df = rename_columns(df)
+    df = remove_duplicates(df)
+    df = force_numeric(df)
+    df = add_interest_rate(df)
+    df = fill_missing(df)
 
-    # Additional summaries
-    print(f"Number of unique countries: {df['country'].nunique()}")
-    print(f"Date range after cleaning: {df['month'].min()} to {df['month'].max()}")
-    print("Missing values summary after cleaning:")
-    print(df.isna().sum())
+    # FEATURES (CRITICAL)
+    df = add_lag_features(df)
+    df = add_rolling_features(df)
+    df = add_momentum(df)
+    df = add_stress_index(df)
 
-    summarize(df)
+    df = create_risk_label(df)
+
+    # Final fill
+    for col in df.columns:
+        if col != "country":
+            df[col] = df[col].fillna(df[col].median())
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT_PATH, index=False)
-    print("Clean dataset saved successfully")
-    print(f"\n✅ CLEAN DATASET SAVED: {OUT_PATH}")
 
+    print(f"\n✅ Saved clean dataset → {OUT_PATH}")
+    print(f"Rows: {len(df)} | Countries: {df['country'].nunique()}")
 
+# ─────────────────────────────────────────────
 if __name__ == "__main__":
     main()
