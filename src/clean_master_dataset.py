@@ -3,41 +3,27 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 
-# ─────────────────────────────────────────────
-# PATHS
-# ─────────────────────────────────────────────
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_PATH = BASE_DIR / "data" / "master_dataset.csv"
 OUT_PATH  = BASE_DIR / "data" / "clean_master_dataset.csv"
 
-# ─────────────────────────────────────────────
-# CONFIG
-# ─────────────────────────────────────────────
 COUNTRY_MAP = {"US":"USA","IN":"IND","BR":"BRA","UK":"GBR","CN":"CHN"}
 
 COLUMN_RENAMES = {
-    "inflation_cpi_pct":  "inflation",
-    "unemployment_pct":   "unemployment",
-    "gdp_current_usd":    "gdp_growth",
-    "exports_pct_gdp":    "exports",
-    "imports_pct_gdp":    "imports",
+    "inflation_cpi_pct": "inflation",
+    "unemployment_pct":  "unemployment",
+    "exports_pct_gdp":   "exports",
+    "imports_pct_gdp":   "imports",
 }
 
-BASE_COLS = ["gdp_growth", "inflation", "unemployment", "interest_rate"]
+BASE_COLS = ["gdp_growth","inflation","unemployment","interest_rate"]
 
-# ─────────────────────────────────────────────
-# LOAD
-# ─────────────────────────────────────────────
+# ─────────────────────────────
 def load_dataset(path):
-    if not path.exists():
-        raise FileNotFoundError(f"Dataset not found: {path}")
     df = pd.read_csv(path)
     print(f"Loaded: {df.shape}")
     return df
 
-# ─────────────────────────────────────────────
-# CLEANING
-# ─────────────────────────────────────────────
 def fix_dates(df):
     df = df.copy()
     df["month"] = pd.to_datetime(df["month"], errors="coerce")
@@ -54,143 +40,115 @@ def standardize_country(df):
 def rename_columns(df):
     return df.rename(columns=COLUMN_RENAMES)
 
-def remove_duplicates(df):
-    return df.drop_duplicates(subset=["country","year","month"])
-
 def force_numeric(df):
-    df = df.copy()
-
-    # 🔥 Remove duplicate columns
-    df = df.loc[:, ~df.columns.duplicated()]
-
+    df = df.loc[:, ~df.columns.duplicated()].copy()
     for col in df.columns:
-        if col == "country":
-            continue
+        if col != "country":
+            df.loc[:, col] = pd.to_numeric(df[col], errors="coerce")
+    return df
 
-        # 🔥 If column is accidentally a DataFrame → fix it
-        if isinstance(df[col], pd.DataFrame):
-            df[col] = df[col].iloc[:, 0]
+# ─────────────────────────────
+# GDP → GROWTH (CRITICAL FIX)
+def compute_gdp_growth(df):
+    df = df.sort_values(["country","year","month"]).copy()
 
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+    if "gdp_current_usd" in df.columns:
+        df["gdp_growth"] = (
+            df.groupby("country")["gdp_current_usd"]
+            .pct_change(12) * 100
+        ).clip(-25,25)
 
+        df = df.drop(columns=["gdp_current_usd"])
+    else:
+        df["gdp_growth"] = 0.0
+
+    return df
+
+def add_interest_rate(df):
+    if "interest_rate" not in df.columns:
+        df["interest_rate"] = df["inflation"] + 2
     return df
 
 def fill_missing(df):
     df = df.copy()
-    numeric_cols = df.select_dtypes(include=np.number).columns
-    df[numeric_cols] = df.groupby("country")[numeric_cols].transform(
+    num = df.select_dtypes(include=np.number).columns
+
+    df[num] = df.groupby("country")[num].transform(
         lambda x: x.interpolate().ffill().bfill()
     )
-    df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+
+    df[num] = df[num].fillna(df[num].median())
+
     return df
 
-def add_interest_rate(df):
-    df = df.copy()
-    if "interest_rate" not in df.columns:
-        if "inflation" in df.columns:
-            df["interest_rate"] = df["inflation"] + 2
-        else:
-            df["interest_rate"] = 5.0
-    return df
-
-# ─────────────────────────────────────────────
-# FEATURE ENGINEERING (MATCH TRAIN MODEL)
-# ─────────────────────────────────────────────
-def add_lag_features(df):
+# ─────────────────────────────
+# FEATURES (LEAN + REALISTIC)
+def add_features(df):
     df = df.sort_values(["country","year","month"]).copy()
 
     for col in BASE_COLS:
         if col in df.columns:
-            for lag in [1,3,6]:
-                df[f"{col}_lag{lag}"] = df.groupby("country")[col].shift(lag)
 
-    return df
+            # lags
+            df[f"{col}_lag1"] = df.groupby("country")[col].shift(1)
+            df[f"{col}_lag3"] = df.groupby("country")[col].shift(3)
 
-def add_rolling_features(df):
-    df = df.copy()
+            # rolling
+            df[f"{col}_roll3"] = df.groupby("country")[col].transform(
+                lambda x: x.rolling(3,1).mean()
+            )
 
-    for col in BASE_COLS:
-        if col in df.columns:
-            df[f"{col}_roll3"] = df.groupby("country")[col].rolling(3).mean().reset_index(0, drop=True)
-            df[f"{col}_roll6"] = df.groupby("country")[col].rolling(6).mean().reset_index(0, drop=True)
-
-    return df
-
-def add_momentum(df):
-    df = df.copy()
-
-    for col in BASE_COLS:
-        if col in df.columns:
+            # momentum
             df[f"{col}_momentum"] = df[col] - df.groupby("country")[col].shift(3)
 
     return df
 
-def add_stress_index(df):
+# ─────────────────────────────
+# LABEL (FUTURE TARGET)
+def create_label(df):
     df = df.copy()
 
-    if set(BASE_COLS).issubset(df.columns):
-        df["stress_index"] = (
-            df["inflation"] * 0.4 +
-            df["unemployment"] * 0.3 -
-            df["gdp_growth"] * 0.3
-        )
+    stress = (
+        (df["inflation"] > 7).astype(int) +
+        (df["gdp_growth"] < 0).astype(int) +
+        (df["unemployment"] > 10).astype(int) +
+        (df["interest_rate"] > 8).astype(int)
+    )
 
-    return df
+    df["risk_now"] = (stress >= 2).astype(int)
 
-# ─────────────────────────────────────────────
-# LABEL
-# ─────────────────────────────────────────────
-def create_risk_label(df):
-    df = df.copy()
+    # 🔥 FUTURE PREDICTION (NO LEAKAGE)
+    df["risk_label"] = df.groupby("country")["risk_now"].shift(-3)
 
-    conditions = [
-        df["inflation"] > 7,
-        df["gdp_growth"] < 0,
-        df["unemployment"] > 10,
-        df["interest_rate"] > 8,
-    ]
-
-    stress = sum(c.astype(int) for c in conditions)
-    df["risk_label"] = (stress >= 2).astype(int)
+    df = df.dropna(subset=["risk_label"])
 
     print("Risk distribution:")
     print(df["risk_label"].value_counts())
 
     return df
 
-# ─────────────────────────────────────────────
-# MAIN PIPELINE
-# ─────────────────────────────────────────────
+# ─────────────────────────────
 def main():
     df = load_dataset(DATA_PATH)
 
     df = fix_dates(df)
     df = standardize_country(df)
     df = rename_columns(df)
-    df = remove_duplicates(df)
     df = force_numeric(df)
+
+    df = compute_gdp_growth(df)
     df = add_interest_rate(df)
     df = fill_missing(df)
 
-    # FEATURES (CRITICAL)
-    df = add_lag_features(df)
-    df = add_rolling_features(df)
-    df = add_momentum(df)
-    df = add_stress_index(df)
+    df = add_features(df)
+    df = create_label(df)
 
-    df = create_risk_label(df)
-
-    # Final fill
-    for col in df.columns:
-        if col != "country":
-            df[col] = df[col].fillna(df[col].median())
+    df = df.fillna(df.median(numeric_only=True))
 
     OUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(OUT_PATH, index=False)
 
-    print(f"\n✅ Saved clean dataset → {OUT_PATH}")
-    print(f"Rows: {len(df)} | Countries: {df['country'].nunique()}")
+    print("\n✅ CLEAN DATA READY (FINAL)")
 
-# ─────────────────────────────────────────────
 if __name__ == "__main__":
     main()

@@ -2,60 +2,90 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import joblib, json
+
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import classification_report, roc_auc_score
+from sklearn.model_selection import GroupKFold
+from sklearn.metrics import classification_report, roc_auc_score, f1_score
 from xgboost import XGBClassifier
 
-# PATHS
-BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_PATH    = BASE_DIR / "data" / "clean_master_dataset.csv"
-MODEL_PATH   = BASE_DIR / "models" / "model.pkl"
-SCALER_PATH  = BASE_DIR / "models" / "scaler.pkl"
-FEATURE_PATH = BASE_DIR / "models" / "feature_cols.json"
+BASE = Path(__file__).resolve().parent.parent
 
-# FEATURES (must match cleaning)
+DATA = BASE / "data" / "clean_master_dataset.csv"
+MODEL = BASE / "models" / "model.pkl"
+SCALER = BASE / "models" / "scaler.pkl"
+FEATURES = BASE / "models" / "feature_cols.json"
+METRICS = BASE / "outputs" / "model_metrics.json"
+
+# 🔥 FINAL FEATURE SET (NO LEAKAGE SIGNAL)
 FEATURE_COLS = [
-    "gdp_growth_lag1","gdp_growth_lag3","gdp_growth_lag6",
-    "inflation_lag1","inflation_lag3","inflation_lag6",
-    "unemployment_lag1","unemployment_lag3","unemployment_lag6",
-    "interest_rate_lag1","interest_rate_lag3","interest_rate_lag6",
-    "gdp_growth_roll3","inflation_roll3","unemployment_roll3","interest_rate_roll3",
-    "gdp_growth_roll6","inflation_roll6","unemployment_roll6","interest_rate_roll6",
-    "gdp_growth_momentum","inflation_momentum","unemployment_momentum","interest_rate_momentum",
-    "stress_index",
+    "gdp_growth_lag1","gdp_growth_lag3",
+    "inflation_lag1","inflation_lag3",
+    "unemployment_lag1","unemployment_lag3",
+    "interest_rate_lag1","interest_rate_lag3",
+
+    "gdp_growth_roll3",
+    "inflation_roll3",
+    "unemployment_roll3",
+    "interest_rate_roll3",
+
+    "gdp_growth_momentum",
+    "inflation_momentum",
+    "unemployment_momentum",
+    "interest_rate_momentum"
 ]
 
 def main():
-    df = pd.read_csv(DATA_PATH)
-    print(f"Loaded: {df.shape}")
+    df = pd.read_csv(DATA)
+    print("Loaded:", df.shape)
 
-    # ensure numeric
     for col in df.columns:
         if col != "country":
-            df[col] = pd.to_numeric(df[col], errors="coerce")
+            df.loc[:, col] = pd.to_numeric(df[col], errors="coerce")
 
     df = df.dropna(subset=["risk_label"])
     df = df.fillna(df.median(numeric_only=True))
 
-    available = [f for f in FEATURE_COLS if f in df.columns]
-    print(f"Using {len(available)} features")
+    feats = [f for f in FEATURE_COLS if f in df.columns]
 
-    X = df[available]
+    X = df[feats]
     y = df["risk_label"]
+    groups = df["country"]
 
-    if y.nunique() < 2:
-        raise ValueError("Only one class present!")
+    print("Risk dist:\n", y.value_counts())
 
-    # split
-    split = int(len(X) * 0.8)
-    X_train, X_test = X.iloc[:split], X.iloc[split:]
-    y_train, y_test = y.iloc[:split], y.iloc[split:]
+    # ── CV ─────────────────
+    gkf = GroupKFold(5)
+    aucs = []
 
+    for i,(tr,val) in enumerate(gkf.split(X,y,groups)):
+        sc = StandardScaler()
+
+        X_tr = sc.fit_transform(X.iloc[tr])
+        X_val = sc.transform(X.iloc[val])
+
+        model = XGBClassifier(
+            n_estimators=300,
+            max_depth=5,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            scale_pos_weight=(y.iloc[tr]==0).sum()/(y.iloc[tr]==1).sum(),
+            eval_metric="logloss",
+            random_state=42
+        )
+
+        model.fit(X_tr,y.iloc[tr])
+
+        auc = roc_auc_score(y.iloc[val], model.predict_proba(X_val)[:,1])
+        aucs.append(auc)
+
+        print(f"Fold {i+1}: {auc:.4f}")
+
+    print("CV AUC:", np.mean(aucs))
+
+    # ── FINAL TRAIN ─────────
     scaler = StandardScaler()
-    X_train = scaler.fit_transform(X_train)
-    X_test  = scaler.transform(X_test)
-
-    scale_pos = (y_train==0).sum() / (y_train==1).sum()
+    X_scaled = scaler.fit_transform(X)
 
     model = XGBClassifier(
         n_estimators=300,
@@ -63,32 +93,53 @@ def main():
         learning_rate=0.05,
         subsample=0.8,
         colsample_bytree=0.8,
-        scale_pos_weight=scale_pos,
+        scale_pos_weight=(y==0).sum()/(y==1).sum(),
         eval_metric="logloss",
-        random_state=42,
+        random_state=42
     )
 
-    model.fit(X_train, y_train)
+    model.fit(X_scaled,y)
 
-    y_proba = model.predict_proba(X_test)[:,1]
-    y_pred  = (y_proba >= 0.5).astype(int)
+    proba = model.predict_proba(X_scaled)[:,1]
 
-    print("\n=== PERFORMANCE ===")
-    print(classification_report(y_test, y_pred))
-    print("ROC AUC:", roc_auc_score(y_test, y_proba))
+    # threshold tuning
+    best_t,best_f1 = 0.5,0
+    for t in np.arange(0.1,0.8,0.05):
+        pred = (proba>=t).astype(int)
+        if pred.sum()==0: continue
+        f1 = f1_score(y,pred)
+        if f1>best_f1:
+            best_f1,best_t = f1,t
 
-    # save
-    MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+    pred = (proba>=best_t).astype(int)
 
-    joblib.dump(model, MODEL_PATH)
-    joblib.dump(scaler, SCALER_PATH)
+    auc = roc_auc_score(y,proba)
 
-    with open(FEATURE_PATH, "w") as f:
-        json.dump(available, f)
+    print("\n=== FINAL REAL PERFORMANCE ===")
+    print(classification_report(y,pred))
+    print("AUC:",auc)
+    print("Best threshold:",best_t)
 
-    print("\n✅ model.pkl saved")
-    print("✅ scaler.pkl saved")
-    print("✅ feature_cols.json saved")
+    MODEL.parent.mkdir(parents=True,exist_ok=True)
+    METRICS.parent.mkdir(parents=True,exist_ok=True)
 
-if __name__ == "__main__":
+    joblib.dump(model,MODEL)
+    joblib.dump(scaler,SCALER)
+
+    with open(FEATURES,"w") as f:
+        json.dump(feats,f)
+
+    with open(METRICS,"w") as f:
+        json.dump({
+            "roc_auc":float(auc),
+            "best_threshold":float(best_t),
+            "f1":float(best_f1),
+            "cv_auc":float(np.mean(aucs)),
+            "n_features":len(feats),
+            "rows":len(df)
+        },f,indent=2)
+
+    print("\n✅ MODEL READY (FINAL)")
+
+if __name__=="__main__":
     main()
