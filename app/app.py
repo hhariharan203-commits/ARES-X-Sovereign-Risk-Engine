@@ -7,7 +7,7 @@ BlackRock / Goldman Sachs — Institutional Grade
 import os
 import sys
 import json
-import pickle
+import joblib
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -47,14 +47,12 @@ st.set_page_config(
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    with open(MODEL_PATH, "rb") as f:
-        return pickle.load(f)
+        return joblib.load(MODEL_PATH)
 
 
 @st.cache_resource(show_spinner=False)
 def load_scaler():
-    with open(SCALER_PATH, "rb") as f:
-        return pickle.load(f)
+        return joblib.load(SCALER_PATH)
 
 
 @st.cache_data(show_spinner=False)
