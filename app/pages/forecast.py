@@ -1,11 +1,16 @@
 import streamlit as st
 import utils
+import plotly.express as px
 
 df = utils.load_data()
-c = st.session_state.get("country","USA")
 
-row = utils.latest(df,c)
+st.title("Macro Feature Space")
 
-sims = utils.monte_carlo(row)
+fig = px.scatter_3d(df,
+    x="gdp_growth",
+    y="inflation",
+    z="unemployment",
+    color="interest_rate"
+)
 
-st.metric("Expected Risk", sims.mean())
+st.plotly_chart(fig)
