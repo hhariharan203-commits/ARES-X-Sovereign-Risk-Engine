@@ -1,5 +1,5 @@
 import streamlit as st
-import utils, ui
+import utils, intelligence, ui
 
 st.set_page_config(layout="wide")
 ui.apply_theme()
@@ -12,12 +12,24 @@ with st.sidebar:
     c = st.selectbox("Country", countries)
     st.session_state["country"] = c
 
-st.title("🌍 Global Risk Intelligence")
-
-risk = utils.global_risk(df)
-st.dataframe(risk[["country","risk_score"]].head(10))
+st.title("Sovereign Risk Intelligence System")
 
 row = utils.latest(df, c)
-score = utils.predict(row)[0]
+score, tier = utils.predict_full(row)
 
-ui.kpi("Selected Country Risk", round(score,3))
+st.metric("Risk Score", round(score,3))
+st.metric("Risk Tier", tier)
+
+intel = intelligence.generate_intelligence(row.iloc[0], score)
+
+st.markdown("### Strategic Intelligence Brief")
+st.write("**Regime:**", intel["regime"])
+
+st.write("**Drivers:**")
+for d in intel["drivers"]:
+    st.write("-", d)
+
+st.write("**Action:**", intel["action"])
+
+st.markdown("### Global Ranking")
+st.dataframe(utils.global_risk(df)[["country","risk_score"]].head(10))
