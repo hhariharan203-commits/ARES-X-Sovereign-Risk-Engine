@@ -1,48 +1,102 @@
-import ui
-ui.apply_theme()
+"""
+ARES-X: Sovereign Risk Intelligence Engine
+Top-tier decision intelligence platform for macro risk.
+"""
+
 import streamlit as st
-import utils, intelligence
+import utils
+from ui import apply_theme, render_sidebar, render_home
 
-st.set_page_config(layout="wide")
+# ─────────────────────────────────────────────
+# PAGE CONFIG
+# ─────────────────────────────────────────────
+st.set_page_config(
+    page_title="ARES-X | Sovereign Risk Intelligence",
+    page_icon="⬡",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-st.title("🛡️ ARES-X Sovereign Intelligence Terminal")
+# ─────────────────────────────────────────────
+# INIT SYSTEM (CRITICAL)
+# ─────────────────────────────────────────────
+@st.cache_resource
+def init_system():
+    df = utils.load_dataset()
+    model = utils.load_model()
+    scaler = utils.load_scaler()
+    features = utils.load_feature_cols()
+    metrics = utils.load_model_metrics()
 
-st.markdown("### AI-driven macro risk → Decision engine")
+    return {
+        "df": df,
+        "model": model,
+        "scaler": scaler,
+        "features": features,
+        "metrics": metrics
+    }
 
-df = utils.load_data()
 
-country = st.selectbox("Country", df["country"].unique())
+system = init_system()
 
-row = utils.latest(df, country)
-risk = utils.predict(row)
+# ─────────────────────────────────────────────
+# SESSION STATE (GLOBAL CONTROL)
+# ─────────────────────────────────────────────
+if "country" not in st.session_state:
+    st.session_state["country"] = "USA"
 
-brief = intelligence.generate_brief(row.iloc[0], risk)
+if "view" not in st.session_state:
+    st.session_state["view"] = "Home"
 
-# KPIs
-c1,c2 = st.columns(2)
-c1.metric("Risk Score", round(risk,3))
+# ─────────────────────────────────────────────
+# APPLY UI
+# ─────────────────────────────────────────────
+apply_theme()
 
-if risk > 0.8:
-    c2.error("HIGH RISK")
-elif risk > 0.5:
-    c2.warning("MODERATE RISK")
+# ─────────────────────────────────────────────
+# SIDEBAR (GLOBAL NAVIGATION)
+# ─────────────────────────────────────────────
+render_sidebar(system)
+
+# ─────────────────────────────────────────────
+# ROUTER (IMPORTANT)
+# ─────────────────────────────────────────────
+view = st.session_state["view"]
+
+if view == "Home":
+    render_home(system)
+
+elif view == "Global Risk":
+    from pages.global_risk import render
+    render(system)
+
+elif view == "Country Intelligence":
+    from pages.country_intelligence import render
+    render(system)
+
+elif view == "Forecast":
+    from pages.forecast import render
+    render(system)
+
+elif view == "Explainability":
+    from pages.explainability import render
+    render(system)
+
+elif view == "Model Performance":
+    from pages.model_performance import render
+    render(system)
+
+elif view == "Portfolio Impact":
+    from pages.portfolio_impact import render
+    render(system)
+
+elif view == "Regime Detection":
+    from pages.regime_detection import render
+    render(system)
+
+elif view == "Scenario Lab":
+    from pages.scenario_lab import render
+    render(system)
+
 else:
-    c2.success("LOW RISK")
-
-st.divider()
-
-# EXECUTIVE BRIEF
-st.header("🧠 Executive Intelligence")
-
-st.subheader("Situation")
-st.write(brief["situation"])
-
-st.subheader("Diagnosis")
-for d in brief["drivers"]:
-    st.write("-", d)
-
-st.subheader("Market Impact")
-st.write(brief["impact"])
-
-st.subheader("Decision")
-st.success(brief["decision"])
+    st.error("Unknown view selected")
