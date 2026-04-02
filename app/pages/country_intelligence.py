@@ -2,14 +2,19 @@ import streamlit as st
 import utils, intelligence
 
 df = utils.load_data()
-c = st.session_state.get("country","USA")
 
-row = utils.latest(df,c)
-score, tier = utils.predict_full(row)
+country = st.selectbox("Country", df["country"].unique())
 
-intel = intelligence.generate_intelligence(row.iloc[0], score)
+row = utils.latest(df, country)
+risk = utils.predict(row)
 
-st.title(c)
-st.metric("Risk", round(score,3))
+brief = intelligence.generate_brief(row.iloc[0], risk)
 
-st.write(intel)
+st.title(f"{country} Intelligence")
+
+st.metric("Risk Score", round(risk,3))
+
+st.write(brief["situation"])
+st.write("Drivers:", brief["drivers"])
+st.write("Impact:", brief["impact"])
+st.success(brief["decision"])
