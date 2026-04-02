@@ -6,9 +6,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from app.ui import apply_theme, render_sidebar
-from app.utils import load_dataset, load_model, load_scaler, load_feature_cols, filter_country, get_country_list
-from app.intelligence import compute_risk_intelligence, _get_feature_importance
+from ui import apply_theme, render_sidebar
+from utils import load_dataset, load_model, load_scaler, load_feature_cols, filter_country, get_country_list
+from intelligence import compute_risk_intelligence, _get_feature_importance
 
 st.set_page_config(page_title="ARES-X | Explainability", layout="wide")
 
