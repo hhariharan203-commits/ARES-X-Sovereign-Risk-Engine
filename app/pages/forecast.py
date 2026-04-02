@@ -6,9 +6,9 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 
-from ui import apply_theme, render_sidebar, PLOTLY_THEME
-from utils import load_dataset, load_model, load_scaler, load_feature_cols, filter_country, get_country_list
-from intelligence import forecast_risk_trajectory
+from app.ui import apply_theme, render_sidebar, PLOTLY_THEME
+from app.utils import load_dataset, load_model, load_scaler, load_feature_cols, filter_country, get_country_list
+from app.intelligence import forecast_risk_trajectory
 
 st.set_page_config(page_title="ARES-X | Forecast", page_icon="⬡", layout="wide")
 apply_theme()
