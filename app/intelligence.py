@@ -9,7 +9,7 @@ import pandas as pd
 from dataclasses import dataclass
 from typing import Optional
 
-from app.utils import scale_features
+from utils import scale_features
 
 # ─────────────────────────────────────────────
 # RISK TAXONOMY
