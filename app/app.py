@@ -4,7 +4,6 @@ Top-tier decision intelligence platform for macro risk.
 """
 
 import streamlit as st
-import app.utils
 from app.ui import apply_theme, render_sidebar, render_home
 
 # ─────────────────────────────────────────────
