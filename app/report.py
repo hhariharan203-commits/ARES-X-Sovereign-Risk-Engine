@@ -12,7 +12,7 @@ import io
 from datetime import datetime
 import pandas as pd
 
-from intelligence import RiskIntelligence, PortfolioIntelligence, ScenarioIntelligence
+from app.intelligence import RiskIntelligence, PortfolioIntelligence, ScenarioIntelligence
 
 
 # ─────────────────────────────────────────────
