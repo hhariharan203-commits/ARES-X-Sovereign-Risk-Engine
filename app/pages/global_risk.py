@@ -1,15 +1,89 @@
+"""
+Global Risk — Decision Intelligence View
+"""
+
 import streamlit as st
-import utils
 import plotly.express as px
+import pandas as pd
 
-df = utils.add_risk(utils.load_data())
+from ui import apply_theme
 
-latest = df.sort_values("year").groupby("country").tail(1)
+# ─────────────────────────────────────────────
+def render(system):
 
-st.title("🌍 Global Risk Landscape")
+    apply_theme()
 
-top = latest.sort_values("risk_score", ascending=False).head(10)
+    df = system["df"]
+    model = system["model"]
+    scaler = system["scaler"]
+    features = system["features"]
 
-fig = px.bar(top, x="country", y="risk_score", color="risk_score")
+    from intelligence import compute_global
 
-st.plotly_chart(fig, use_container_width=True)
+    gdf = compute_global(df, model, scaler, features)
+
+    # ─────────────────────────────────────────
+    # HEADER
+    # ─────────────────────────────────────────
+    st.title("Global Sovereign Risk")
+
+    st.markdown("""
+### What is happening
+Global macro conditions are being evaluated across all countries using the trained model.
+
+### Why it matters
+Cross-country instability drives:
+- capital flows
+- currency volatility
+- sovereign risk exposure
+
+### What to do
+Focus on highest-risk economies and adjust exposure accordingly.
+""")
+
+    # ─────────────────────────────────────────
+    # KPIs
+    # ─────────────────────────────────────────
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Countries", len(gdf))
+    col2.metric("Avg Risk", round(gdf["Risk Score"].mean(), 3))
+    col3.metric("Highest Risk", gdf.iloc[0]["Country"])
+
+    st.divider()
+
+    # ─────────────────────────────────────────
+    # DECISION LAYER (NEW)
+    # ─────────────────────────────────────────
+    top = gdf.head(3)
+
+    st.markdown("## Key Risk Signals")
+
+    for _, row in top.iterrows():
+        st.markdown(f"""
+**{row['Country']}**
+- Risk Score: {round(row['Risk Score'],3)}
+- Level: {row['Risk Level']}
+- Decision: {row['Decision']}
+""")
+
+    # ─────────────────────────────────────────
+    # MAP
+    # ─────────────────────────────────────────
+    fig = px.choropleth(
+        gdf,
+        locations="Country",
+        locationmode="country names",
+        color="Risk Score",
+        hover_data=["Risk Level"],
+        color_continuous_scale="Reds"
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # ─────────────────────────────────────────
+    # TABLE
+    # ─────────────────────────────────────────
+    st.markdown("## Full Ranking")
+
+    st.dataframe(gdf, use_container_width=True)
