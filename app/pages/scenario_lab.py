@@ -1,13 +1,27 @@
 import streamlit as st
-import utils
+import utils, intelligence
 
 df = utils.load_data()
-c = st.session_state.get("country","USA")
 
-row = utils.latest(df,c).copy()
+country = st.selectbox("Country", df["country"].unique())
 
-row["inflation"] += st.slider("Inflation Shock",-5,10,2)
+shock = st.slider("Inflation Shock", -5, 10, 0)
 
-score,_ = utils.predict_full(row)
+row = utils.latest(df, country).copy()
 
-st.metric("Scenario Risk", score)
+base = utils.predict(row)
+
+row["inflation"] += shock
+row["inflation_lag1"] = row["inflation"]
+
+new = utils.predict(row)
+
+st.title("Scenario Intelligence")
+
+st.metric("Base", round(base,3))
+st.metric("Scenario", round(new,3))
+st.metric("Impact", round(new-base,3))
+
+brief = intelligence.generate_brief(row.iloc[0], new)
+
+st.write("Decision:", brief["decision"])
