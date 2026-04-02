@@ -145,7 +145,7 @@ def build_reasoning(
 # ─── Feature Attribution ─────────────────────────────────────────────────────
 
 def compute_drivers_batch(model, scaler, feature_cols, df, base_probs):
-    X = df[feature_cols].values.astype(float)
+    X = df[feature_cols].astype(float)
     epsilon = 0.05
     results = []
 
@@ -219,7 +219,7 @@ def run_scenario(model, scaler, feature_cols, row, shocks, country):
     shocked_row = apply_scenario_shock(row, feature_cols, shocks)
 
     try:
-        X = shocked_row[feature_cols].values.astype(float).reshape(1, -1)
+        X = shocked_row[feature_cols].astype(float).to_frame().T
         Xs = scaler.transform(X)
         after = float(model.predict_proba(Xs)[0][1])
     except:
@@ -242,7 +242,7 @@ def enrich_dataframe(df, model, scaler, feature_cols):
 
     df = df.copy()
 
-    X = df[feature_cols].values.astype(float)
+    X = df[feature_cols].astype(float)
     Xs = scaler.transform(X)
     probs = model.predict_proba(Xs)[:, 1]
 
