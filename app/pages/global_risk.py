@@ -6,7 +6,7 @@ import streamlit as st
 import plotly.express as px
 import pandas as pd
 
-from app.ui import apply_theme
+from ui import apply_theme
 
 # ─────────────────────────────────────────────
 def render(system):
@@ -18,7 +18,7 @@ def render(system):
     scaler = system["scaler"]
     features = system["features"]
 
-    from app.intelligence import compute_global
+    from intelligence import compute_global
 
     gdf = compute_global(df, model, scaler, features)
 
