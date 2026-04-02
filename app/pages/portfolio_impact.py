@@ -6,9 +6,9 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from app.ui import apply_theme, render_sidebar
-from app.utils import load_dataset, load_model, load_scaler, load_feature_cols
-from app.intelligence import compute_global_risk_table, compute_portfolio_intelligence
+from ui import apply_theme, render_sidebar
+from utils import load_dataset, load_model, load_scaler, load_feature_cols
+from intelligence import compute_global_risk_table, compute_portfolio_intelligence
 
 st.set_page_config(page_title="ARES-X | Portfolio Impact", layout="wide")
 
