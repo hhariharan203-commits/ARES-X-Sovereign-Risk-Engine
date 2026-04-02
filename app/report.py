@@ -1,36 +1,25 @@
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+import streamlit as st
+import utils, intelligence
 
-def generate_report(country, score, intelligence):
+df = utils.add_risk(utils.load_data())
 
-    file_path = f"{country}_risk_report.pdf"
+latest = df.sort_values("year").groupby("country").tail(1)
 
-    doc = SimpleDocTemplate(file_path)
-    styles = getSampleStyleSheet()
+top = latest.sort_values("risk_score", ascending=False).head(3)
 
-    content = []
+st.title("Executive Risk Brief")
 
-    # Title
-    content.append(Paragraph(f"{country} Sovereign Risk Report", styles["Title"]))
-    content.append(Spacer(1, 12))
+for _,row in top.iterrows():
+    brief = intelligence.generate_brief(row, row["risk_score"])
 
-    # Score
-    content.append(Paragraph(f"<b>Risk Score:</b> {round(score,3)}", styles["Normal"]))
-    content.append(Spacer(1, 12))
+    st.markdown(f"""
+    ### {row['country']} ({round(row['risk_score'],2)})
 
-    # Regime
-    content.append(Paragraph(f"<b>Regime:</b> {intelligence['regime']}", styles["Normal"]))
-    content.append(Spacer(1, 12))
+    **Situation:** {brief['situation']}
 
-    # Drivers
-    content.append(Paragraph("<b>Key Drivers:</b>", styles["Normal"]))
-    for d in intelligence["drivers"]:
-        content.append(Paragraph(f"- {d}", styles["Normal"]))
-    content.append(Spacer(1, 12))
+    **Drivers:** {', '.join(brief['drivers'])}
 
-    # Action
-    content.append(Paragraph(f"<b>Recommended Action:</b> {intelligence['action']}", styles["Normal"]))
+    **Impact:** {brief['impact']}
 
-    doc.build(content)
-
-    return file_path
+    **Decision:** {brief['decision']}
+    """)
