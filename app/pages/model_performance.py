@@ -5,8 +5,8 @@ Model Performance — Decision Validation Layer
 import streamlit as st
 import pandas as pd
 
-from app.ui import apply_theme, render_sidebar
-from app.utils import load_model_metrics
+from ui import apply_theme, render_sidebar
+from utils import load_model_metrics
 
 st.set_page_config(page_title="ARES-X | Model Performance", layout="wide")
 
