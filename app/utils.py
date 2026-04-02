@@ -7,9 +7,9 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent
 
-DATA_DIR = BASE_DIR / "data"
-MODEL_DIR = BASE_DIR / "models"
-OUTPUT_DIR = BASE_DIR / "outputs"
+DATA_DIR = BASE_DIR.parent / "data"
+MODEL_DIR = BASE_DIR.parent / "models"
+OUTPUT_DIR = BASE_DIR.parent / "outputs"
 
 
 def _check(path):
