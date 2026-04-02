@@ -174,8 +174,7 @@ def render_scenario_lab(df, model, scaler, feature_cols):
 
         st.metric("Before", f"{result['before']:.2%}")
         st.metric("After", f"{result['after']:.2%}")
-        st.metric("Delta", f"{result['delta']:.2%}")
-        
+        st.metric("Delta", f"{result['delta']:.2%}")        
 def render_global_risk(df: pd.DataFrame):
     summary = global_risk_summary(df)
 
