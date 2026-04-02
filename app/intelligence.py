@@ -1,28 +1,50 @@
-def generate_intelligence(row, score):
+def generate_brief(row, risk):
 
+    # Situation
+    if risk > 0.8:
+        situation = "Severe macroeconomic instability"
+    elif risk > 0.5:
+        situation = "Emerging macro stress"
+    else:
+        situation = "Stable macro environment"
+
+    # Diagnosis
     drivers = []
 
     if row["inflation"] > 6:
-        drivers.append("Inflation pressure building")
+        drivers.append("Inflation pressure rising")
 
     if row["gdp_growth"] < 1:
-        drivers.append("Growth slowdown detected")
+        drivers.append("Growth slowdown")
 
     if row["unemployment"] > 8:
-        drivers.append("Labor market weakening")
+        drivers.append("Labor market weakness")
 
-    if score > 0.75:
-        regime = "CRISIS RISK REGIME"
-        action = "Reduce exposure, shift to safe assets, hedge currency risk"
-    elif score > 0.5:
-        regime = "EARLY WARNING REGIME"
-        action = "Rebalance portfolio, monitor macro signals"
+    if row["interest_rate"] > 7:
+        drivers.append("Tight monetary conditions")
+
+    if not drivers:
+        drivers.append("No major imbalances")
+
+    # Impact
+    if risk > 0.8:
+        impact = "High probability of capital flight and currency depreciation"
+    elif risk > 0.5:
+        impact = "Increased volatility across equity and FX markets"
     else:
-        regime = "STABLE REGIME"
-        action = "Maintain allocation"
+        impact = "Stable conditions with low systemic risk"
+
+    # Decision
+    if risk > 0.8:
+        decision = "Exit or hedge exposure immediately"
+    elif risk > 0.5:
+        decision = "Reduce exposure and rebalance portfolio"
+    else:
+        decision = "Maintain or increase exposure"
 
     return {
-        "regime": regime,
+        "situation": situation,
         "drivers": drivers,
-        "action": action
+        "impact": impact,
+        "decision": decision
     }
