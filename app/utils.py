@@ -1,38 +1,182 @@
-import pandas as pd
+"""
+utils.py — Production-grade data + prediction engine
+All model inference flows through this module.
+"""
+
+import json
+import pickle
 import numpy as np
-import joblib, json
+import pandas as pd
 import streamlit as st
+from pathlib import Path
 
-DATA = "data/clean_master_dataset.csv"
-MODEL = "models/model.pkl"
-SCALER = "models/scaler.pkl"
-FEATS = "models/feature_cols.json"
-METRICS = "outputs/model_metrics.json"
+# ─────────────────────────────────────────────────────────
+# PATHS (FIXED STRUCTURE)
+# ─────────────────────────────────────────────────────────
+BASE_DIR = Path(__file__).resolve().parent
 
-@st.cache_data
-def load_data():
-    return pd.read_csv(DATA)
+DATA_PATH = BASE_DIR / "data" / "clean_master_dataset.csv"
+MODEL_PATH = BASE_DIR / "models" / "model.pkl"
+SCALER_PATH = BASE_DIR / "models" / "scaler.pkl"
+FEATURES_PATH = BASE_DIR / "models" / "feature_cols.json"
+METRICS_PATH = BASE_DIR / "outputs" / "model_metrics.json"
 
-@st.cache_resource
-def load_model():
-    model = joblib.load(MODEL)
-    scaler = joblib.load(SCALER)
-    feats = json.load(open(FEATS))
-    return model, scaler, feats
 
-def predict(row):
-    model, scaler, feats = load_model()
-    X = row[feats].fillna(0)
-    X = scaler.transform(X)
-    return model.predict_proba(X)[0][1]
+def _check(path: Path):
+    if not path.exists():
+        raise FileNotFoundError(f"Missing required file: {path}")
+    return path
 
-def latest(df, country):
-    return df[df["country"]==country].sort_values(["year","month"]).tail(1)
 
-def add_risk(df):
-    df = df.copy()
-    df["risk_score"] = df.apply(lambda x: predict(x.to_frame().T), axis=1)
+# ─────────────────────────────────────────────────────────
+# LOADERS (CACHED)
+# ─────────────────────────────────────────────────────────
+@st.cache_data(show_spinner=False)
+def load_dataset() -> pd.DataFrame:
+    df = pd.read_csv(_check(DATA_PATH))
+    df.columns = [c.strip().lower() for c in df.columns]
     return df
 
-def metrics():
-    return json.load(open(METRICS))
+
+@st.cache_resource(show_spinner=False)
+def load_model():
+    with open(_check(MODEL_PATH), "rb") as f:
+        return pickle.load(f)
+
+
+@st.cache_resource(show_spinner=False)
+def load_scaler():
+    with open(_check(SCALER_PATH), "rb") as f:
+        return pickle.load(f)
+
+
+@st.cache_data(show_spinner=False)
+def load_feature_cols() -> list:
+    with open(_check(FEATURES_PATH)) as f:
+        return json.load(f)
+
+
+@st.cache_data(show_spinner=False)
+def load_model_metrics() -> dict:
+    with open(_check(METRICS_PATH)) as f:
+        return json.load(f)
+
+
+# ─────────────────────────────────────────────────────────
+# CORE FEATURE ENGINE
+# ─────────────────────────────────────────────────────────
+def build_feature_matrix(df: pd.DataFrame, feature_cols: list) -> pd.DataFrame:
+    missing = [c for c in feature_cols if c not in df.columns]
+    if missing:
+        raise KeyError(f"Missing features: {missing}")
+    return df[feature_cols].copy()
+
+
+def scale_features(X: pd.DataFrame, scaler) -> np.ndarray:
+    try:
+        return scaler.transform(X)
+    except Exception as e:
+        raise RuntimeError(f"Scaling failed: {e}")
+
+
+# ─────────────────────────────────────────────────────────
+# 🔥 CORE PREDICTION PIPELINE (CRITICAL)
+# ─────────────────────────────────────────────────────────
+def predict_risk(df_row: pd.DataFrame) -> tuple[float, int]:
+    """
+    End-to-end inference:
+    row → features → scaler → model → probability
+    """
+    model = load_model()
+    scaler = load_scaler()
+    features = load_feature_cols()
+
+    X = build_feature_matrix(df_row, features)
+    X_scaled = scale_features(X, scaler)
+
+    proba = model.predict_proba(X_scaled)[:, 1][0]
+    pred = int(proba >= 0.5)
+
+    return float(proba), pred
+
+
+# ─────────────────────────────────────────────────────────
+# COUNTRY UTILITIES
+# ─────────────────────────────────────────────────────────
+def get_country_list(df: pd.DataFrame) -> list:
+    return sorted(df["country"].dropna().unique())
+
+
+def filter_country(df: pd.DataFrame, country: str) -> pd.DataFrame:
+    return df[df["country"] == country].sort_values(["year", "month"])
+
+
+def latest_row(df: pd.DataFrame, country: str) -> pd.DataFrame:
+    d = filter_country(df, country)
+    return d.tail(1)
+
+
+def latest_all(df: pd.DataFrame) -> pd.DataFrame:
+    return df.sort_values(["year", "month"]).groupby("country").tail(1)
+
+
+# ─────────────────────────────────────────────────────────
+# FORECAST HELPERS
+# ─────────────────────────────────────────────────────────
+def rolling_trend(series: pd.Series, window: int = 3) -> float:
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    if len(s) < 2:
+        return 0.0
+    y = s.iloc[-window:]
+    x = np.arange(len(y))
+    return float(np.polyfit(x, y, 1)[0])
+
+
+def lag_project(series: pd.Series, steps: int = 3) -> list:
+    s = pd.to_numeric(series, errors="coerce").dropna()
+    if len(s) < 2:
+        return [float(s.iloc[-1])] * steps if len(s) else [0.0] * steps
+
+    delta = s.diff().dropna().iloc[-3:].mean()
+    last = float(s.iloc[-1])
+
+    return [last + delta * (i + 1) for i in range(steps)]
+
+
+# ─────────────────────────────────────────────────────────
+# GLOBAL RISK ENGINE
+# ─────────────────────────────────────────────────────────
+def compute_global_risk(df: pd.DataFrame) -> pd.DataFrame:
+    latest = latest_all(df)
+
+    scores = []
+    for _, row in latest.iterrows():
+        p, _ = predict_risk(row.to_frame().T)
+        scores.append(p)
+
+    latest["risk_score"] = scores
+    return latest.sort_values("risk_score", ascending=False)
+
+
+# ─────────────────────────────────────────────────────────
+# PORTFOLIO ENGINE
+# ─────────────────────────────────────────────────────────
+def portfolio_risk(df: pd.DataFrame, weights: dict) -> dict:
+    latest = latest_all(df)
+
+    total_risk = 0
+    for _, row in latest.iterrows():
+        country = row["country"]
+        w = weights.get(country, 0)
+
+        p, _ = predict_risk(row.to_frame().T)
+        total_risk += p * w
+
+    return {
+        "portfolio_risk": round(total_risk, 3),
+        "status": (
+            "High Risk" if total_risk > 0.6 else
+            "Moderate Risk" if total_risk > 0.3 else
+            "Low Risk"
+        )
+    }
