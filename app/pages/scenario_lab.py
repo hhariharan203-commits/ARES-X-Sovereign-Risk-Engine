@@ -6,12 +6,8 @@ c = st.session_state.get("country","USA")
 
 row = utils.latest(df,c).copy()
 
-infl = st.slider("Inflation Shock", -5,10,2)
-gdp  = st.slider("GDP Shock", -10,5,-2)
+row["inflation"] += st.slider("Inflation Shock",-5,10,2)
 
-row["inflation"] += infl
-row["gdp_growth"] += gdp
+score,_ = utils.predict_full(row)
 
-score = utils.predict(row)[0]
-
-st.metric("Scenario Risk", round(score,3))
+st.metric("Scenario Risk", score)
