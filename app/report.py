@@ -1,29 +1,36 @@
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-from datetime import datetime
 
-def generate_report(country, score, summary, drivers, output_path="report.pdf"):
-    doc = SimpleDocTemplate(output_path)
+def generate_report(country, score, intelligence):
+
+    file_path = f"{country}_risk_report.pdf"
+
+    doc = SimpleDocTemplate(file_path)
     styles = getSampleStyleSheet()
 
     content = []
 
-    content.append(Paragraph(f"<b>{country} Sovereign Risk Report</b>", styles["Title"]))
+    # Title
+    content.append(Paragraph(f"{country} Sovereign Risk Report", styles["Title"]))
     content.append(Spacer(1, 12))
 
-    content.append(Paragraph(f"Generated: {datetime.now()}", styles["Normal"]))
+    # Score
+    content.append(Paragraph(f"<b>Risk Score:</b> {round(score,3)}", styles["Normal"]))
     content.append(Spacer(1, 12))
 
-    content.append(Paragraph(f"<b>Risk Score:</b> {round(score,3)}", styles["Heading2"]))
+    # Regime
+    content.append(Paragraph(f"<b>Regime:</b> {intelligence['regime']}", styles["Normal"]))
     content.append(Spacer(1, 12))
 
-    content.append(Paragraph("<b>Executive Summary:</b>", styles["Heading2"]))
-    content.append(Paragraph(summary, styles["Normal"]))
+    # Drivers
+    content.append(Paragraph("<b>Key Drivers:</b>", styles["Normal"]))
+    for d in intelligence["drivers"]:
+        content.append(Paragraph(f"- {d}", styles["Normal"]))
     content.append(Spacer(1, 12))
 
-    content.append(Paragraph("<b>Key Drivers:</b>", styles["Heading2"]))
-    for k, v in drivers.items():
-        content.append(Paragraph(f"{k}: {round(float(v),3)}", styles["Normal"]))
+    # Action
+    content.append(Paragraph(f"<b>Recommended Action:</b> {intelligence['action']}", styles["Normal"]))
 
     doc.build(content)
-    return output_path
+
+    return file_path
