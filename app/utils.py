@@ -4,7 +4,7 @@ All model inference flows through this module.
 """
 
 import json
-import pickle
+import joblib   # ✅ FIXED (was pickle)
 import numpy as np
 import pandas as pd
 import streamlit as st
@@ -41,15 +41,13 @@ def load_dataset() -> pd.DataFrame:
 @st.cache_resource(show_spinner=False)
 def load_model():
     path = MODEL_DIR / "model.pkl"
-    with open(_check(path), "rb") as f:
-        return pickle.load(f)
+    return joblib.load(_check(path))   # ✅ FIXED
 
 
 @st.cache_resource(show_spinner=False)
 def load_scaler():
     path = MODEL_DIR / "scaler.pkl"
-    with open(_check(path), "rb") as f:
-        return pickle.load(f)
+    return joblib.load(_check(path))   # ✅ FIXED
 
 
 @st.cache_data(show_spinner=False)
