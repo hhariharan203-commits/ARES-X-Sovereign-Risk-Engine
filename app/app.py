@@ -1,126 +1,46 @@
-"""
-ARES-X Sovereign Risk Intelligence System
-Main Application (Final Production Version)
-"""
-
 import streamlit as st
-from pathlib import Path
-import sys
+import utils, intelligence
 
-# ─────────────────────────────────────────────
-# PATH FIX (IMPORTANT)
-# ─────────────────────────────────────────────
-APP_DIR = Path(__file__).resolve().parent
-if str(APP_DIR) not in sys.path:
-    sys.path.append(str(APP_DIR))
+st.set_page_config(layout="wide")
 
-# ─────────────────────────────────────────────
-# IMPORTS
-# ─────────────────────────────────────────────
-import utils
-import ui
-import intelligence
-import report
+st.title("🛡️ ARES-X Sovereign Intelligence Terminal")
 
-# ─────────────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────────────
-st.set_page_config(
-    page_title="ARES-X Sovereign Risk Engine",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+st.markdown("### AI-driven macro risk → Decision engine")
 
-ui.apply_theme()
-
-# ─────────────────────────────────────────────
-# LOAD DATA
-# ─────────────────────────────────────────────
 df = utils.load_data()
-countries = sorted(df["country"].unique())
 
-# ─────────────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────────────
-with st.sidebar:
-    st.title("🛡️ ARES-X")
-    st.caption("Sovereign Risk Intelligence System")
+country = st.selectbox("Country", df["country"].unique())
 
-    selected_country = st.selectbox("Select Country", countries)
+row = utils.latest(df, country)
+risk = utils.predict(row)
 
-    st.session_state["country"] = selected_country
+brief = intelligence.generate_brief(row.iloc[0], risk)
 
-    st.divider()
+# KPIs
+c1,c2 = st.columns(2)
+c1.metric("Risk Score", round(risk,3))
 
-    st.success("Model: Active")
-    st.success("Data: Loaded")
-
-# ─────────────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────────────
-st.title("🌍 Sovereign Risk Intelligence Platform")
-st.caption("AI-driven macro risk analytics · Decision intelligence · Portfolio impact")
-
-# ─────────────────────────────────────────────
-# CURRENT COUNTRY ANALYSIS
-# ─────────────────────────────────────────────
-row = utils.latest(df, selected_country)
-
-score, tier = utils.predict_full(row)
-
-col1, col2 = st.columns(2)
-
-with col1:
-    st.metric("Risk Score", f"{score:.3f}")
-
-with col2:
-    st.metric("Risk Tier", tier)
-
-# ─────────────────────────────────────────────
-# INTELLIGENCE ENGINE (KEY WOW SECTION)
-# ─────────────────────────────────────────────
-intel = intelligence.generate_intelligence(row.iloc[0], score)
-
-st.markdown("## 🧠 Strategic Intelligence Brief")
-
-st.markdown(f"### Regime: {intel['regime']}")
-
-st.markdown("### Key Risk Drivers")
-if intel["drivers"]:
-    for d in intel["drivers"]:
-        st.write(f"- {d}")
+if risk > 0.8:
+    c2.error("HIGH RISK")
+elif risk > 0.5:
+    c2.warning("MODERATE RISK")
 else:
-    st.write("No major risk drivers detected")
+    c2.success("LOW RISK")
 
-st.markdown("### Recommended Action")
-st.write(intel["action"])
+st.divider()
 
-# ─────────────────────────────────────────────
-# GLOBAL RISK RANKING
-# ─────────────────────────────────────────────
-st.markdown("## 🌐 Global Risk Ranking")
+# EXECUTIVE BRIEF
+st.header("🧠 Executive Intelligence")
 
-ranking = utils.global_risk(df)[["country", "risk_score"]]
-st.dataframe(ranking.head(10), use_container_width=True)
+st.subheader("Situation")
+st.write(brief["situation"])
 
-# ─────────────────────────────────────────────
-# REPORT GENERATION (EXECUTIVE FEATURE)
-# ─────────────────────────────────────────────
-st.markdown("## 📄 Executive Report")
+st.subheader("Diagnosis")
+for d in brief["drivers"]:
+    st.write("-", d)
 
-if st.button("Generate Risk Report"):
-    file_path = report.generate_report(selected_country, score, intel)
+st.subheader("Market Impact")
+st.write(brief["impact"])
 
-    with open(file_path, "rb") as f:
-        st.download_button(
-            label="Download Report",
-            data=f,
-            file_name=file_path,
-            mime="application/pdf"
-        )
-
-# ─────────────────────────────────────────────
-# FOOTER
-# ─────────────────────────────────────────────
-st.markdown("---")
-st.caption("ARES-X · Built for Strategic Risk Intelligence · Production Ready System")
+st.subheader("Decision")
+st.success(brief["decision"])
