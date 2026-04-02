@@ -1,3 +1,6 @@
+import ui
+ui.apply_theme()
+
 import streamlit as st
 import utils, intelligence
 
