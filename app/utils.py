@@ -11,15 +11,14 @@ import streamlit as st
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────
-# PATHS (FIXED STRUCTURE)
+# PATHS (FIXED FOR STREAMLIT CLOUD)
 # ─────────────────────────────────────────────────────────
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).parent
+ROOT_DIR = BASE_DIR.parent
 
-DATA_PATH = BASE_DIR / "data" / "clean_master_dataset.csv"
-MODEL_PATH = BASE_DIR / "models" / "model.pkl"
-SCALER_PATH = BASE_DIR / "models" / "scaler.pkl"
-FEATURES_PATH = BASE_DIR / "models" / "feature_cols.json"
-METRICS_PATH = BASE_DIR / "outputs" / "model_metrics.json"
+DATA_DIR = ROOT_DIR / "data"
+MODEL_DIR = ROOT_DIR / "models"
+OUTPUT_DIR = ROOT_DIR / "outputs"
 
 
 def _check(path: Path):
@@ -33,32 +32,37 @@ def _check(path: Path):
 # ─────────────────────────────────────────────────────────
 @st.cache_data(show_spinner=False)
 def load_dataset() -> pd.DataFrame:
-    df = pd.read_csv(_check(DATA_PATH))
+    path = DATA_DIR / "clean_master_dataset.csv"
+    df = pd.read_csv(_check(path))
     df.columns = [c.strip().lower() for c in df.columns]
     return df
 
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    with open(_check(MODEL_PATH), "rb") as f:
+    path = MODEL_DIR / "model.pkl"
+    with open(_check(path), "rb") as f:
         return pickle.load(f)
 
 
 @st.cache_resource(show_spinner=False)
 def load_scaler():
-    with open(_check(SCALER_PATH), "rb") as f:
+    path = MODEL_DIR / "scaler.pkl"
+    with open(_check(path), "rb") as f:
         return pickle.load(f)
 
 
 @st.cache_data(show_spinner=False)
 def load_feature_cols() -> list:
-    with open(_check(FEATURES_PATH)) as f:
+    path = MODEL_DIR / "feature_cols.json"
+    with open(_check(path)) as f:
         return json.load(f)
 
 
 @st.cache_data(show_spinner=False)
 def load_model_metrics() -> dict:
-    with open(_check(METRICS_PATH)) as f:
+    path = OUTPUT_DIR / "model_metrics.json"
+    with open(_check(path)) as f:
         return json.load(f)
 
 
@@ -80,13 +84,9 @@ def scale_features(X: pd.DataFrame, scaler) -> np.ndarray:
 
 
 # ─────────────────────────────────────────────────────────
-# 🔥 CORE PREDICTION PIPELINE (CRITICAL)
+# CORE PREDICTION PIPELINE
 # ─────────────────────────────────────────────────────────
 def predict_risk(df_row: pd.DataFrame) -> tuple[float, int]:
-    """
-    End-to-end inference:
-    row → features → scaler → model → probability
-    """
     model = load_model()
     scaler = load_scaler()
     features = load_feature_cols()
