@@ -1,7 +1,28 @@
-def insight(score):
+def generate_intelligence(row, score):
+
+    drivers = []
+
+    if row["inflation"] > 6:
+        drivers.append("Inflation pressure building")
+
+    if row["gdp_growth"] < 1:
+        drivers.append("Growth slowdown detected")
+
+    if row["unemployment"] > 8:
+        drivers.append("Labor market weakening")
+
     if score > 0.75:
-        return "🔴 High systemic risk driven by macro instability."
+        regime = "CRISIS RISK REGIME"
+        action = "Reduce exposure, shift to safe assets, hedge currency risk"
     elif score > 0.5:
-        return "🟠 Rising risk — early warning signals emerging."
+        regime = "EARLY WARNING REGIME"
+        action = "Rebalance portfolio, monitor macro signals"
     else:
-        return "🟢 Stable macroeconomic environment."
+        regime = "STABLE REGIME"
+        action = "Maintain allocation"
+
+    return {
+        "regime": regime,
+        "drivers": drivers,
+        "action": action
+    }
