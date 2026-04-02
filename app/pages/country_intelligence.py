@@ -6,7 +6,7 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-from ui import apply_theme
+from app.ui import apply_theme
 
 # ─────────────────────────────────────────────
 def render(system):
@@ -18,7 +18,7 @@ def render(system):
     scaler = system["scaler"]
     features = system["features"]
 
-    from intelligence import compute_risk_intelligence
+    from app.intelligence import compute_risk_intelligence
 
     countries = sorted(df["country"].unique())
     country = st.session_state["country"]
