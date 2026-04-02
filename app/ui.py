@@ -175,3 +175,25 @@ def render_scenario_lab(df, model, scaler, feature_cols):
         st.metric("Before", f"{result['before']:.2%}")
         st.metric("After", f"{result['after']:.2%}")
         st.metric("Delta", f"{result['delta']:.2%}")
+        
+def render_global_risk(df: pd.DataFrame):
+    summary = global_risk_summary(df)
+
+    st.markdown("## Global Risk Overview")
+
+    top10 = df.sort_values("risk_score", ascending=False).head(10)
+
+    fig = go.Figure(go.Bar(
+        x=top10["risk_score"],
+        y=top10["country"],
+        orientation="h",
+        marker_color=[DECISION_COLORS.get(d) for d in top10["decision"]],
+    ))
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("---")
+
+    st.write("### Summary")
+    st.write(f"Average Risk: {summary['avg_risk']:.2%}")
+    st.write(f"Status: {summary['status']}")
