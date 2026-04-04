@@ -1,7 +1,7 @@
 ARES-X: Sovereign Crisis Intelligence Engine
 
 🔗 Live Demo:
-https://ares-x-sovereign-risk-engine-fvmjor3zxycwjjwbbntwwh.streamlit.app/
+https://ares-x-sovereign-risk-engine-6jv4ugrjxdigb7tqhntzcg.streamlit.app/
 💡 No setup required — runs directly in browser
 
 ---
