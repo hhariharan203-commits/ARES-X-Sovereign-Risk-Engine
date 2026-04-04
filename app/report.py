@@ -149,3 +149,32 @@ def generate_global_report() -> str:
     lines.append("=" * 70)
 
     return "\n".join(lines)
+
+# ─────────────────────────────────────────────────────────────
+# PDF EXPORT (ADD ONLY THIS — NO CHANGES ABOVE)
+# ─────────────────────────────────────────────────────────────
+
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.pagesizes import letter
+from io import BytesIO
+
+
+def generate_pdf_report(report_text: str):
+    """
+    Convert report text into PDF (returns BytesIO buffer)
+    """
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    styles = getSampleStyleSheet()
+
+    content = []
+
+    for line in report_text.split("\n"):
+        content.append(Paragraph(line, styles["Normal"]))
+        content.append(Spacer(1, 10))
+
+    doc.build(content)
+    buffer.seek(0)
+
+    return buffer
