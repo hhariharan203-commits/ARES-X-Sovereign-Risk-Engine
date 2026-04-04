@@ -28,39 +28,61 @@ def make_decision(country: str) -> dict:
     delta      = fc.get("delta", 0.0)
     confidence = fc.get("confidence", 50.0)
 
-    # Scoring system
+    # Scoring system (UPGRADED)
     score = 0
 
-    # GDP signal
-    if pred_gdp > 3.0:      score += 3
-    elif pred_gdp > 1.5:    score += 1
-    elif pred_gdp <= 0:     score -= 3
-    else:                   score -= 1
+    # --- GDP LEVEL ---
+    if pred_gdp > 4:
+        score += 3
+    elif pred_gdp > 2:
+        score += 2
+    elif pred_gdp > 0:
+        score += 0
+    else:
+        score -= 3
 
-    # GDP momentum
-    if delta > 0.5:          score += 1
-    elif delta < -0.5:       score -= 1
+    # --- MOMENTUM (FIXED ONLY) ---
+    if delta > 0.5:
+        score += 2
+    elif delta > 0:
+        score += 1
+    elif delta > -0.2:
+        score -= 2
+    else:
+        score -= 3
 
-    # Risk
-    if risk_score < 35:      score += 2
-    elif risk_score < 55:    score += 0
-    elif risk_score < 70:    score -= 1
-    else:                    score -= 3
+    # --- RISK ---
+    if risk_score < 30:
+        score += 3
+    elif risk_score < 60:
+        score += 1
+    else:
+        score -= 2
 
-    # Macro score
-    if ms > 65:              score += 2
-    elif ms > 45:            score += 0
-    else:                    score -= 2
+    # --- MACRO SCORE ---
+    if ms > 70:
+        score += 2
+    elif ms > 50:
+        score += 1
+    else:
+        score -= 2
 
-    # Regime bonus/penalty
-    if regime == "Expansion":    score += 1
-    elif regime == "Recession":  score -= 2
-    elif regime == "Stagflation": score -= 1
+    # --- REGIME ---
+    if regime == "Expansion":
+        score += 3
+    elif regime == "Slowdown":
+        score += 1
+    elif regime == "Stagflation":
+        score -= 2
+    elif regime == "Recession":
+        score -= 3
 
-    # Decision thresholds
-    if score >= 4:
+    # Decision thresholds (UPDATED)
+    if score >= 7:
+        decision = "STRONG BUY"
+    elif score >= 4:
         decision = "BUY"
-    elif score >= 0:
+    elif score >= 1:
         decision = "HOLD"
     else:
         decision = "DEFENSIVE"
@@ -86,7 +108,7 @@ def make_decision(country: str) -> dict:
 
 
 def _build_rationale(decision, pred_gdp, curr_gdp, delta, risk_score, ms, regime, inflation, confidence) -> str:
-    if decision == "BUY":
+    if decision in ["BUY","STRONG BUY"]:
         return (
             f"Model forecasts GDP growth of {pred_gdp:.1f}% (Δ {delta:+.1f}% vs current), "
             f"with a macro health score of {ms:.0f}/100 and contained risk score of {risk_score:.0f}. "
