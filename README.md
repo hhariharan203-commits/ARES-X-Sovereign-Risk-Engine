@@ -9,7 +9,7 @@ https://ares-x-sovereign-risk-engine-6jv4ugrjxdigb7tqhntzcg.streamlit.app/
 
 ## 📌 Overview
 
-ARES-X is an AI-driven macro intelligence and sovereign risk decision system designed to replicate how institutional investors analyze global economies.
+ARES-X is a macro intelligence and sovereign risk decision system designed to simulate how institutional investors analyze global economies.
 
 It transforms macroeconomic data into:
 
@@ -18,9 +18,9 @@ It transforms macroeconomic data into:
 - Macro regime classification  
 - Investment decisions (STRONG BUY → DEFENSIVE)  
 - Portfolio allocation strategies  
-- Institutional-grade macro reports (PDF)
+- Structured macro intelligence reports (PDF)  
 
-The system integrates **machine learning, macroeconomics, and decision logic** into a unified framework for real-world financial analysis.
+The system integrates **machine learning, macroeconomic signals, and decision logic** into a unified analytical framework.
 
 ---
 
@@ -28,10 +28,10 @@ The system integrates **machine learning, macroeconomics, and decision logic** i
 
 Unlike typical ML projects, ARES-X is:
 
-- A **decision system**, not just a prediction model  
+- A **decision-focused system**, not just a prediction model  
 - Designed with **investment logic (buy / hold / defensive)**  
 - Built as a **modular macro intelligence pipeline**  
-- Focused on **real-world financial use cases**  
+- Structured to **simulate institutional workflows**, not replicate them  
 
 ---
 
@@ -51,7 +51,7 @@ Macroeconomic indicators:
 
 ### 2. Forecasting Engine
 - XGBoost model predicts GDP growth trends  
-- Outputs forward-looking macro signal  
+- Produces forward-looking macro signals  
 
 ---
 
@@ -67,16 +67,16 @@ Transforms macro + risk signals into:
 
 | Decision      | Interpretation |
 |--------------|--------------|
-| STRONG BUY   | High growth, low risk |
+| STRONG BUY   | Strong growth, low risk |
 | BUY          | Stable macro environment |
 | HOLD         | Neutral conditions |
-| DEFENSIVE    | High-risk environment |
+| DEFENSIVE    | Elevated macro risk |
 
 ---
 
 ### 5. Portfolio Allocation Engine
 - Suggests asset allocation based on macro regime  
-- Aligns strategy with economic conditions  
+- Aligns investment strategy with economic conditions  
 
 ---
 
@@ -84,7 +84,7 @@ Transforms macro + risk signals into:
 Generates structured macro reports including:
 - Executive summary  
 - Forecast outlook  
-- Risk breakdown  
+- Risk assessment  
 - Investment recommendation  
 - Portfolio allocation  
 
@@ -97,7 +97,7 @@ Generates structured macro reports including:
 - GDP forecast trends  
 - Investment decision classification  
 - Portfolio allocation strategy  
-- Downloadable investor-grade reports  
+- Downloadable macro intelligence reports  
 
 ---
 
@@ -109,7 +109,7 @@ Generates structured macro reports including:
 | RMSE | Optimized |
 | MAE | Low |
 
-> Model is optimized for **directional macro forecasting**, not exact prediction.
+> Model is optimized for **directional macro forecasting**, not precise point prediction.
 
 ---
 
@@ -118,10 +118,10 @@ Generates structured macro reports including:
 ### 1. Global Risk Terminal
 - Cross-country comparison  
 - Risk rankings  
-- Macro snapshot  
+- Macro overview  
 
 ### 2. Country Intelligence
-- Forecast + risk analysis  
+- Forecast + risk breakdown  
 - Decision output  
 - Supporting macro drivers  
 
@@ -139,9 +139,9 @@ Generates structured macro reports including:
 
 ---
 
-## 📑 PDF Reports (Investor-Grade)
+## 📑 PDF Reports
 
-ARES-X generates reports similar to institutional research notes:
+ARES-X generates structured reports including:
 
 - Executive summary  
 - GDP forecast  
@@ -165,16 +165,16 @@ ARES-X generates reports similar to institutional research notes:
 
 ## 🧠 Design Principles
 
-- Decision-focused, not prediction-only  
-- Modular architecture (forecast → risk → decision)  
-- Explainable macro signals  
-- Scalable and extensible pipeline  
+- Decision-focused (not prediction-only)  
+- Modular pipeline (forecast → risk → decision)  
+- Interpretable macro signals  
+- Scalable and extensible architecture  
 
 ---
 
 ## 🎯 Use Cases
 
-- Sovereign risk analysis  
+- Sovereign risk monitoring  
 - Investment decision support  
 - Macro research automation  
 - Portfolio strategy development  
@@ -194,19 +194,22 @@ ARES-X/
 └── requirements.txt  
 
 ---
+
 ## 🔧 Installation (Local)
+
 pip install -r requirements.txt
 streamlit run app/main.py
----
 
 🔒 Limitations
 Dataset size can be expanded
 VIX represents global volatility (not country-specific)
-Designed for decision support, not execution trading
+Designed as a decision-support prototype, not a production trading system
+
 👤 Author
 Hariharan B
 MBA – Finance
 Data Analyst | AI & Macro Intelligence
+
 ⭐ Final Note
 ARES-X is not just a machine learning project.
-It is a macro decision intelligence system that combines forecasting, risk modeling, and investment logic — similar to workflows used in institutional finance and global macro funds.
+It is a macro decision intelligence system that combines forecasting, risk modeling, and investment logic — designed to simulate real-world analytical workflows used in macro research and investment environments.
