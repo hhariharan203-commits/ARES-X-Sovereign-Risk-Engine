@@ -194,19 +194,18 @@ ARES-X/
 └── requirements.txt  
 
 ---
-
 ## 🔧 Installation (Local)
-
-```bash
 pip install -r requirements.txt
 streamlit run app/main.py
+---
+
 🔒 Limitations
 Dataset size can be expanded
 VIX represents global volatility (not country-specific)
 Designed for decision support, not execution trading
 👤 Author
-Hariharan
-MBA – Finance & Business Analytics
+Hariharan B
+MBA – Finance
 Data Analyst | AI & Macro Intelligence
 ⭐ Final Note
 ARES-X is not just a machine learning project.
