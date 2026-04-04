@@ -593,7 +593,7 @@ elif page == "🧪  Scenario Lab":
 # PAGE 10 — DECISION TERMINAL
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "🎯  Decision Terminal":
-    page_header("Decision Terminal", "Investment action engine: BUY / HOLD / DEFENSIVE")
+    page_header("Decision Terminal", "Investment action engine: STRONG BUY / BUY / HOLD / DEFENSIVE")
 
     col_sel, col_bulk = st.columns([3, 1])
     with col_sel:
@@ -650,17 +650,24 @@ elif page == "🎯  Decision Terminal":
             "Forecast GDP": d["pred_gdp"],
         } for d in all_decs])
 
-        buy_df  = dec_df[dec_df["Decision"] == "BUY"]
-        hold_df = dec_df[dec_df["Decision"] == "HOLD"]
-        def_df  = dec_df[dec_df["Decision"] == "DEFENSIVE"]
+        strong_buy_df = dec_df[dec_df["Decision"] == "STRONG BUY"]
+        buy_df        = dec_df[dec_df["Decision"] == "BUY"]
+        hold_df       = dec_df[dec_df["Decision"] == "HOLD"]
+        def_df        = dec_df[dec_df["Decision"] == "DEFENSIVE"]
 
-        d1, d2, d3 = st.columns(3)
+        d1, d2, d3, d4 = st.columns(4)
+
         with d1:
-            kpi_card("BUY",       str(len(buy_df)),  "countries", color=ACCENT_GREEN)
+                   kpi_card("STRONG BUY", str(len(strong_buy_df)), "countries", color=ACCENT_GREEN)
+
         with d2:
-            kpi_card("HOLD",      str(len(hold_df)), "countries", color=ACCENT_AMBER)
+                   kpi_card("BUY", str(len(buy_df)), "countries", color=ACCENT_GREEN)
+
         with d3:
-            kpi_card("DEFENSIVE", str(len(def_df)),  "countries", color=ACCENT_RED)
+                   kpi_card("HOLD", str(len(hold_df)), "countries", color=ACCENT_AMBER)
+
+        with d4:
+                   kpi_card("DEFENSIVE", str(len(def_df)), "countries", color=ACCENT_RED)
 
         st.dataframe(
             dec_df.sort_values("Score", ascending=False)
