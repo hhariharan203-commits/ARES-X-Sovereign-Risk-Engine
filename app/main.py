@@ -637,45 +637,46 @@ elif page == "🎯  Decision Terminal":
             st.markdown(f'<div style="color:#C9D1D9;font-size:0.88rem;padding:0.3rem 0">{f_}</div>',
                         unsafe_allow_html=True)
 
-    if show_bulk:
-        section_header("All-Country Decision Matrix")
-        all_decs = bulk_decisions()
-        dec_df   = pd.DataFrame([{
-            "Country":     d["country"],
-            "Decision":    d["decision"],
-            "Score":       d["score"],
-            "Macro Score": d["macro_score"],
-            "Risk Score":  d["risk_score"],
-            "Regime":      d["regime"],
-            "Forecast GDP": d["pred_gdp"],
-        } for d in all_decs])
+   if show_bulk:
+    section_header("All-Country Decision Matrix")
+    all_decs = bulk_decisions()
 
-        strong_buy_df = dec_df[dec_df["Decision"] == "STRONG BUY"]
-        buy_df        = dec_df[dec_df["Decision"] == "BUY"]
-        hold_df       = dec_df[dec_df["Decision"] == "HOLD"]
-        def_df        = dec_df[dec_df["Decision"] == "DEFENSIVE"]
+    dec_df = pd.DataFrame([{
+        "Country":     d["country"],
+        "Decision":    d["decision"],
+        "Score":       d["score"],
+        "Macro Score": d["macro_score"],
+        "Risk Score":  d["risk_score"],
+        "Regime":      d["regime"],
+        "Forecast GDP": d["pred_gdp"],
+    } for d in all_decs])
 
-        d1, d2, d3, d4 = st.columns(4)
+    strong_buy_df = dec_df[dec_df["Decision"] == "STRONG BUY"]
+    buy_df        = dec_df[dec_df["Decision"] == "BUY"]
+    hold_df       = dec_df[dec_df["Decision"] == "HOLD"]
+    def_df        = dec_df[dec_df["Decision"] == "DEFENSIVE"]
 
-        with d1:
-                   kpi_card("STRONG BUY", str(len(strong_buy_df)), "countries", color=ACCENT_GREEN)
+    d1, d2, d3, d4 = st.columns(4)
 
-        with d2:
-                   kpi_card("BUY", str(len(buy_df)), "countries", color=ACCENT_GREEN)
+    with d1:
+        kpi_card("STRONG BUY", str(len(strong_buy_df)), "countries", color=ACCENT_GREEN)
+    with d2:
+        kpi_card("BUY", str(len(buy_df)), "countries", color=ACCENT_GREEN)
+    with d3:
+        kpi_card("HOLD", str(len(hold_df)), "countries", color=ACCENT_AMBER)
+    with d4:
+        kpi_card("DEFENSIVE", str(len(def_df)), "countries", color=ACCENT_RED)
 
-        with d3:
-                   kpi_card("HOLD", str(len(hold_df)), "countries", color=ACCENT_AMBER)
-
-        with d4:
-                   kpi_card("DEFENSIVE", str(len(def_df)), "countries", color=ACCENT_RED)
-
-        st.dataframe(
-            dec_df.sort_values("Score", ascending=False)
-            .style.format({"Macro Score": "{:.1f}", "Risk Score": "{:.1f}", "Forecast GDP": "{:.2f}%"}),
-            use_container_width=True,
-            height=350,
-        )
-
+    st.dataframe(
+        dec_df.sort_values("Score", ascending=False)
+        .style.format({
+            "Macro Score": "{:.1f}",
+            "Risk Score": "{:.1f}",
+            "Forecast GDP": "{:.2f}%"
+        }),
+        use_container_width=True,
+        height=350,
+    )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 11 — EXPLAINABILITY
