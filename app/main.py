@@ -754,10 +754,10 @@ elif page == "📋  Reports":
         with st.spinner("Generating intelligence report…"):
             if report_type == "Global Report":
                 report_text = generate_global_report()
-                filename    = "ARES-X_Global_Report.txt"
+                filename = "ARES-X_Global_Report.txt"
             else:
                 report_text = generate_country_report(country)
-                filename    = f"ARES-X_{country}_Report.txt"
+                filename = f"ARES-X_{country}_Report.txt"
 
         st.markdown(f"""
         <div style="background:#161B22;border:1px solid #21262D;border-radius:8px;
@@ -765,12 +765,25 @@ elif page == "📋  Reports":
         font-size:0.78rem;color:#C9D1D9;white-space:pre-wrap">{report_text}</div>
         """, unsafe_allow_html=True)
 
+        # TXT download
         st.download_button(
-            label    = "⬇️ Download Report (.txt)",
-            data     = report_text,
-            file_name = filename,
-            mime     = "text/plain",
+            label="⬇️ Download Report (.txt)",
+            data=report_text,
+            file_name=filename,
+            mime="text/plain",
         )
+
+        # ✅ PDF generation (FIXED)
+        pdf_buffer = generate_pdf_report(report_text)
+
+        # ✅ PDF download
+        st.download_button(
+            label="📄 Download Report (.pdf)",
+            data=pdf_buffer,
+            file_name=filename.replace(".txt", ".pdf"),
+            mime="application/pdf",
+        )
+
     else:
         insight_card(
             "HOW TO USE REPORTS",
