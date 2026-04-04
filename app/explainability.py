@@ -22,6 +22,9 @@ def get_feature_importance(top_n: int = 20) -> pd.DataFrame:
         "Importance": importances,
     }).sort_values("Importance", ascending=False).reset_index(drop=True)
 
+    # ✅ FIX (ADD THIS ONLY)
+    df = df[df["Importance"] > 0]
+
     # Categorize features
     def _categorize(feat):
         feat = feat.lower()
