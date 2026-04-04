@@ -39,6 +39,42 @@ def generate_country_report(country: str) -> str:
     lines.append(f"  Generated: {ts}")
     lines.append("=" * 70)
 
+    # ───────── EXECUTIVE SUMMARY ─────────
+    lines.append(_section("Executive Summary"))
+    lines.append(
+        f"  {country.upper()} is rated {dec['decision']} with GDP forecast at "
+        f"{fc.get('predicted_gdp', 0):.1f}% and risk score {rk['risk_score']:.0f}."
+    )
+    lines.append(
+        f"  Macro score of {dec['macro_score']:.0f}/100 under a {intel.get('regime', 'N/A')} regime "
+        f"supports this positioning with {fc.get('confidence', 0):.0f}% model confidence."
+    )
+
+    # ───────── INVESTMENT THESIS ─────────
+    lines.append(_section("Investment Thesis"))
+
+    lines.append(
+        f"  {country.upper()} presents a {dec['decision']} opportunity driven by:"
+    )
+
+    if fc.get("predicted_gdp", 0) > 2:
+        lines.append("  • Strong GDP growth momentum")
+
+    if rk["inflation"] < 5:
+        lines.append("  • Controlled inflation environment")
+
+    if rk["unemployment"] < 6:
+        lines.append("  • Stable labor market conditions")
+
+    if rk["risk_score"] < 60:
+        lines.append("  • Moderate macro risk profile")
+
+    lines.append("")
+    lines.append(
+        f"  The current {intel.get('regime', 'N/A')} regime supports this positioning "
+        f"with favorable macro dynamics."
+    )
+
     # Model
     lines.append(_section("Model Performance"))
     lines.append(f"  R²   : {metrics.get('r2', 0):.4f}")
@@ -144,23 +180,18 @@ def generate_pdf_report(report_text: str):
             content.append(Spacer(1, 6))
             continue
 
-        # Title
         if "ARES-X" in line:
             content.append(Paragraph(line, title_style))
 
-        # Skip dividers
         elif "──" in line or "===" in line:
             continue
 
-        # Section headers
         elif line.isupper():
             content.append(Paragraph(line, section_style))
 
-        # Highlight key signals
         elif line.startswith("►"):
             content.append(Paragraph(f"<b>{line}</b>", body_style))
 
-        # Normal text
         else:
             content.append(Paragraph(line, body_style))
 
