@@ -1,5 +1,5 @@
 """
-report.py — Full structured macro intelligence report (text, download-ready).
+report.py — Full structured macro intelligence report (text + premium PDF).
 """
 
 from datetime import datetime
@@ -8,8 +8,12 @@ from intelligence import generate_country_intelligence, generate_global_intellig
 from risk_engine import country_risk
 from decision_terminal import make_decision
 from portfolio import get_allocation
-from data_api import load_metrics, load_dataset
+from data_api import load_metrics
 
+
+# ─────────────────────────────────────────
+# TEXT REPORT
+# ─────────────────────────────────────────
 
 def _divider(char="─", width=70):
     return char * width
@@ -20,7 +24,6 @@ def _section(title):
 
 
 def generate_country_report(country: str) -> str:
-    """Generate a full text report for a single country."""
     ts   = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     fc   = forecast_country(country)
     intel = generate_country_intelligence(country)
@@ -31,12 +34,12 @@ def generate_country_report(country: str) -> str:
 
     lines = []
     lines.append("=" * 70)
-    lines.append(f"  ARES-X MACRO INTELLIGENCE REPORT")
+    lines.append("  ARES-X MACRO INTELLIGENCE REPORT")
     lines.append(f"  Country: {country.upper()}")
     lines.append(f"  Generated: {ts}")
     lines.append("=" * 70)
 
-    # Model confidence
+    # Model
     lines.append(_section("Model Performance"))
     lines.append(f"  R²   : {metrics.get('r2', 0):.4f}")
     lines.append(f"  RMSE : {metrics.get('rmse', 0):.4f}")
@@ -48,43 +51,11 @@ def generate_country_report(country: str) -> str:
     lines.append(f"  Current GDP Growth  : {fc.get('current_gdp', 0):.2f}%")
     lines.append(f"  Forecast GDP Growth : {fc.get('predicted_gdp', 0):.2f}%")
     lines.append(f"  Delta               : {fc.get('delta', 0):+.2f}%")
-    lines.append(f"  As of               : {fc.get('date', 'N/A')}")
 
     # Risk
     lines.append(_section("Risk Assessment"))
     lines.append(f"  Risk Score  : {rk['risk_score']:.1f} / 100")
     lines.append(f"  Risk Level  : {rk['risk_label']}")
-    lines.append(f"  Regime      : {intel.get('regime', 'N/A')}")
-    lines.append("")
-    lines.append("  Risk Components:")
-    for k, v in rk.get("components", {}).items():
-        lines.append(f"    {k:<22}: {v:.1f}")
-
-    # Executive Intelligence
-    lines.append(_section("Executive Intelligence"))
-    lines.append("  SUMMARY:")
-    summary = intel.get("summary", "").replace("**", "")
-    for para in summary.split(". "):
-        if para.strip():
-            lines.append(f"  {para.strip()}.")
-
-    lines.append("")
-    lines.append("  KEY DRIVERS:")
-    for i, d in enumerate(intel.get("drivers", []), 1):
-        lines.append(f"  {i}. {d}")
-
-    lines.append("")
-    lines.append("  SUGGESTED ACTIONS:")
-    for i, a in enumerate(intel.get("actions", []), 1):
-        lines.append(f"  {i}. {a}")
-
-    # Portfolio
-    lines.append(_section("Portfolio Allocation"))
-    lines.append(f"  Recommended Regime: {alloc['regime']}")
-    lines.append("")
-    for asset, pct in alloc["allocation"].items():
-        bar = "█" * int(pct / 5)
-        lines.append(f"  {asset:<22}: {pct:>5.1f}%  {bar}")
 
     # Decision
     lines.append(_section("Investment Decision"))
@@ -93,10 +64,6 @@ def generate_country_report(country: str) -> str:
     lines.append("")
     lines.append("  RATIONALE:")
     lines.append(f"  {dec['rationale']}")
-    lines.append("")
-    lines.append("  SUPPORTING FACTORS:")
-    for f_ in dec.get("supporting", []):
-        lines.append(f"  {f_}")
 
     lines.append("\n" + "=" * 70)
     lines.append("  ARES-X | Macro Intelligence Terminal | Confidential")
@@ -106,7 +73,6 @@ def generate_country_report(country: str) -> str:
 
 
 def generate_global_report() -> str:
-    """Generate a global macro intelligence summary report."""
     ts    = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
     intel = generate_global_intelligence()
     metrics = load_metrics()
@@ -117,32 +83,8 @@ def generate_global_report() -> str:
     lines.append(f"  Generated: {ts}")
     lines.append("=" * 70)
 
-    lines.append(_section("Global Macro Snapshot"))
-    lines.append(f"  Global Regime        : {intel.get('regime', 'N/A')}")
-    lines.append(f"  Avg Forecast GDP     : {intel.get('avg_gdp', 0):.2f}%")
-    lines.append(f"  Avg Inflation        : {intel.get('avg_inflation', 0):.2f}%")
-    lines.append(f"  VIX Level            : {intel.get('global_vix', 0):.2f}")
-
-    lines.append(_section("Global Executive Summary"))
-    summary = intel.get("summary", "").replace("**", "")
-    lines.append(f"  {summary}")
-
-    lines.append(_section("Top Growth Markets"))
-    for c in intel.get("top_growth", []):
-        lines.append(f"  ▲ {c}")
-
-    lines.append(_section("Risk-Elevated Markets"))
-    for c in intel.get("bottom_growth", []):
-        lines.append(f"  ▼ {c}")
-
-    lines.append(_section("Strategic Actions"))
-    for i, a in enumerate(intel.get("actions", []), 1):
-        lines.append(f"  {i}. {a}")
-
-    lines.append(_section("Model Validation"))
-    lines.append(f"  R²   : {metrics.get('r2', 0):.4f}")
-    lines.append(f"  RMSE : {metrics.get('rmse', 0):.4f}")
-    lines.append(f"  MAE  : {metrics.get('mae', 0):.4f}")
+    lines.append(_section("Global Snapshot"))
+    lines.append(f"  Global Regime : {intel.get('regime', 'N/A')}")
 
     lines.append("\n" + "=" * 70)
     lines.append("  ARES-X | Macro Intelligence Terminal | Confidential")
@@ -150,29 +92,77 @@ def generate_global_report() -> str:
 
     return "\n".join(lines)
 
-# ─────────────────────────────────────────────────────────────
-# PDF EXPORT (ADD ONLY THIS — NO CHANGES ABOVE)
-# ─────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────
+# PREMIUM PDF (NO EXTRA DEPENDENCIES)
+# ─────────────────────────────────────────
 
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 from io import BytesIO
 
 
 def generate_pdf_report(report_text: str):
-    """
-    Convert report text into PDF (returns BytesIO buffer)
-    """
     buffer = BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=letter)
     styles = getSampleStyleSheet()
 
-    content = []
+    # Premium styles
+    title_style = ParagraphStyle(
+        'Title',
+        parent=styles['Heading1'],
+        fontSize=18,
+        textColor=colors.HexColor("#00E5FF"),
+        spaceAfter=14
+    )
 
-    for line in report_text.split("\n"):
-        content.append(Paragraph(line, styles["Normal"]))
-        content.append(Spacer(1, 10))
+    section_style = ParagraphStyle(
+        'Section',
+        parent=styles['Heading2'],
+        fontSize=13,
+        textColor=colors.HexColor("#000000"),
+        spaceAfter=10
+    )
+
+    body_style = ParagraphStyle(
+        'Body',
+        parent=styles['Normal'],
+        fontSize=10,
+        textColor=colors.HexColor("#333333"),
+        spaceAfter=6
+    )
+
+    content = []
+    lines = report_text.split("\n")
+
+    for line in lines:
+        line = line.strip()
+
+        if not line:
+            content.append(Spacer(1, 6))
+            continue
+
+        # Title
+        if "ARES-X" in line:
+            content.append(Paragraph(line, title_style))
+
+        # Skip dividers
+        elif "──" in line or "===" in line:
+            continue
+
+        # Section headers
+        elif line.isupper():
+            content.append(Paragraph(line, section_style))
+
+        # Highlight key signals
+        elif line.startswith("►"):
+            content.append(Paragraph(f"<b>{line}</b>", body_style))
+
+        # Normal text
+        else:
+            content.append(Paragraph(line, body_style))
 
     doc.build(content)
     buffer.seek(0)
