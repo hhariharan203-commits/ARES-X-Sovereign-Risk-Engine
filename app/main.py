@@ -638,8 +638,8 @@ elif page == "🎯  Decision Terminal":
                         unsafe_allow_html=True)
 
     if show_bulk:
-    section_header("All-Country Decision Matrix")
-    all_decs = bulk_decisions()
+     section_header("All-Country Decision Matrix")
+     all_decs = bulk_decisions()
 
     dec_df = pd.DataFrame([{
         "Country":     d["country"],
