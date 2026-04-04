@@ -36,7 +36,7 @@ from portfolio import get_allocation, country_rank_table
 from explainability import get_feature_importance, get_category_importance
 from scenario_lab import run_scenario
 from decision_terminal import make_decision, bulk_decisions
-from report import generate_country_report, generate_global_report
+from report import generate_country_report, generate_global_report, generate_pdf_report
 from utils import fmt_pct, fmt_signed, regime_label, regime_color, risk_color, decision_color
 
 inject_css()
