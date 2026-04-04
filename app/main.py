@@ -637,7 +637,7 @@ elif page == "🎯  Decision Terminal":
             st.markdown(f'<div style="color:#C9D1D9;font-size:0.88rem;padding:0.3rem 0">{f_}</div>',
                         unsafe_allow_html=True)
 
-   if show_bulk:
+    if show_bulk:
     section_header("All-Country Decision Matrix")
     all_decs = bulk_decisions()
 
