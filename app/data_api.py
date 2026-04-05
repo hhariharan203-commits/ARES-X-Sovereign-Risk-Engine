@@ -29,7 +29,7 @@ def load_metrics() -> dict:
         return json.load(f)
 
 
-@st.cache_resource(ttl=600)
+@st.cache_resource(ttl=0)
 def load_model():
     return joblib.load(MODEL_PATH)
 
