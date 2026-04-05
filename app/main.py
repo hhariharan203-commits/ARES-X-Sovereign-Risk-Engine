@@ -239,21 +239,41 @@ elif page == "🗺️  Heatmap":
     selected_countries = countries[:top_n]
 
     hm_data = []
+
     for c in selected_countries:
         row_data = get_country_series(df, c)
+
         if row_data.empty:
             hm_data.append([0] * len(FEATURES))
         else:
             latest = row_data.iloc[-1]
-            hm_data.append([float(latest.get(f, 0)) for f in FEATURES])
+
+            row_vals = []
+            for f in FEATURES:
+                if f == "vix":
+                    row_vals.append(float(get_country_volatility(c)))  # ✅ FIXED VIX
+                else:
+                    row_vals.append(float(latest.get(f, 0)))
+
+            hm_data.append(row_vals)
 
     z = np.array(hm_data)
-    fig = heatmap_chart(z, feat_labels, selected_countries, "Macro Signals Heatmap")
+
+    fig = heatmap_chart(
+        z,
+        feat_labels,
+        selected_countries,
+        "Macro Signals Heatmap"
+    )
+
     st.plotly_chart(fig, use_container_width=True)
 
     section_header("Reading the Heatmap")
-    insight_card("HOW TO READ", "Brighter cells indicate higher values. Compare rows to identify outlier countries. Scan columns to spot macro factor concentrations across markets.")
-
+    insight_card(
+        "HOW TO READ",
+        "Brighter cells indicate higher values. Compare rows to identify outlier countries. "
+        "Scan columns to spot macro factor concentrations across markets."
+    )
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 5 — MULTI-COUNTRY COMPARISON
@@ -412,41 +432,80 @@ elif page == "⚠️  Risk Monitor":
 
     col_gauge, col_breakdown, col_stats = st.columns([2, 2, 2])
 
+    # ── Gauge ────────────────────────────────────────────────────────────────
     with col_gauge:
         section_header("Risk Score Gauge")
         fig = gauge_chart(rk["risk_score"], f"{country} Risk Score")
         st.plotly_chart(fig, use_container_width=True)
+
         st.markdown(f"""
         <div style="text-align:center;margin-top:-1rem">
-            <span style="background:{risk_color(rk['risk_label'])}22;color:{risk_color(rk['risk_label'])};
-            padding:4px 14px;border-radius:20px;font-weight:600;font-size:0.85rem">
-            {rk['risk_label']} RISK
+            <span style="background:{risk_color(rk['risk_label'])}22;
+                         color:{risk_color(rk['risk_label'])};
+                         padding:4px 14px;
+                         border-radius:20px;
+                         font-weight:600;
+                         font-size:0.85rem">
+                {rk['risk_label']} RISK
             </span>
         </div>
         """, unsafe_allow_html=True)
 
+    # ── Risk Breakdown ───────────────────────────────────────────────────────
     with col_breakdown:
         section_header("Risk Components")
+
         comps  = rk["components"]
         labels = list(comps.keys())
         vals   = list(comps.values())
-        fig2   = go.Figure(go.Bar(
-            x=vals, y=labels, orientation="h",
-            marker_color=[ACCENT_GREEN if v < 40 else (ACCENT_AMBER if v < 70 else ACCENT_RED) for v in vals],
+
+        fig2 = go.Figure(go.Bar(
+            x=vals,
+            y=labels,
+            orientation="h",
+            marker_color=[
+                ACCENT_GREEN if v < 40 else
+                (ACCENT_AMBER if v < 70 else ACCENT_RED)
+                for v in vals
+            ],
         ))
+
         apply_plotly_style(fig2)
         fig2.update_layout(height=260, xaxis_title="Risk Score (0–100)")
         st.plotly_chart(fig2, use_container_width=True)
 
+    # ── Macro Stats ──────────────────────────────────────────────────────────
     with col_stats:
         section_header("Macro Signals")
-        kpi_card("GDP Growth",    fmt_pct(rk["gdp"]),          "", color=ACCENT_GREEN if rk["gdp"] > 0 else ACCENT_RED)
-        kpi_card("Inflation",     fmt_pct(rk["inflation"]),    "")
-        kpi_card("Unemployment",  fmt_pct(rk["unemployment"]), "")
-        kpi_card("Trade Balance", f"{rk['trade_balance']:.2f}", "")
 
+        kpi_card("GDP Growth",
+                 fmt_pct(rk["gdp"]),
+                 "",
+                 color=ACCENT_GREEN if rk["gdp"] > 0 else ACCENT_RED)
+
+        kpi_card("Inflation",
+                 fmt_pct(rk["inflation"]),
+                 "")
+
+        kpi_card("Unemployment",
+                 fmt_pct(rk["unemployment"]),
+                 "")
+
+        kpi_card("Trade Balance",
+                 f"{rk['trade_balance']:.2f}",
+                 "")
+
+    # ── Global Risk Table ─────────────────────────────────────────────────────
     section_header("Global Risk Rankings")
+
     risk_table = global_risk_table()
+
+    # ✅ CRITICAL FIX — dynamic VIX per country
+    risk_table = risk_table.copy()
+    risk_table["VIX"] = risk_table["Country"].apply(
+        lambda c: float(get_country_volatility(c))
+    )
+
     st.dataframe(
         risk_table.style.format({
             "Risk Score":   "{:.1f}",
@@ -458,7 +517,6 @@ elif page == "⚠️  Risk Monitor":
         use_container_width=True,
         height=320,
     )
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE 8 — PORTFOLIO INSIGHTS
