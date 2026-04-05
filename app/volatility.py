@@ -1,5 +1,5 @@
 """
-volatility.py — FINAL PRODUCTION VERSION (real + differentiated)
+volatility.py — FINAL PRODUCTION VERSION (real + differentiated + CDS + Yield Curve)
 """
 
 import hashlib
@@ -7,7 +7,9 @@ from live_data import (
     fetch_vix,
     fetch_country_bond_vol,
     fetch_country_fx_vol,
-    fetch_country_equity_vol
+    fetch_country_equity_vol,
+    fetch_cds_proxy,          # 🔥 ADDED
+    fetch_yield_curve_signal  # 🔥 ADDED
 )
 
 # ─────────────────────────────────────
@@ -78,12 +80,18 @@ def get_country_volatility(country: str) -> float:
         fx    = float(fetch_country_fx_vol(country_name))
         eq    = float(fetch_country_equity_vol(country_name))
 
-        # Base model
+        # 🔥 NEW: CREDIT + MACRO STRUCTURE
+        cds          = float(fetch_cds_proxy(country_name))
+        yield_curve  = float(fetch_yield_curve_signal())
+
+        # 🔥 UPGRADED MODEL
         base_score = (
-            0.4 * vix +
-            0.3 * bond +
-            0.2 * fx +
-            0.1 * eq
+            0.30 * vix +
+            0.20 * bond +
+            0.15 * fx +
+            0.10 * eq +
+            0.15 * cds +
+            0.10 * yield_curve
         )
 
         # Country risk adjustment
