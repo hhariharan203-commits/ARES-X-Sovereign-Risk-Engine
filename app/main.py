@@ -38,6 +38,7 @@ from scenario_lab import run_scenario
 from decision_terminal import make_decision, bulk_decisions
 from report import generate_country_report, generate_global_report, generate_pdf_report
 from utils import fmt_pct, fmt_signed, regime_label, regime_color, risk_color, decision_color
+from volatility import get_country_volatility
 
 inject_css()
 
@@ -175,6 +176,8 @@ elif page == "🌍  Country Intelligence":
     ms    = macro_score(country)
 
     sig = intel.get("signals", {})
+    
+    vix_value = get_country_volatility(country)
 
     section_header("Key Macro Indicators")
     c1, c2, c3, c4, c5, c6 = st.columns(6)
@@ -183,7 +186,7 @@ elif page == "🌍  Country Intelligence":
     with c3: kpi_card("Unemployment",  fmt_pct(sig.get("unemployment", 0)), sig.get("unemp_trend", ""))
     with c4: kpi_card("Interest Rate", fmt_pct(sig.get("interest_rate", 0)), sig.get("rate_trend", ""))
     with c5: kpi_card("Trade Balance", f"{sig.get('trade_balance', 0):.1f}", "Exports − Imports")
-    with c6: kpi_card("VIX",           f"{sig.get('vix', 0):.1f}",          sig.get("vix_trend", ""), color=ACCENT_RED if sig.get("vix", 20) > 25 else ACCENT_CYAN)
+    with c6: kpi_card("VIX",           f"{vix_value:.1f}",          sig.get("vix_trend", ""), color=ACCENT_RED if vix_value > 25 else ACCENT_CYAN)
 
     col_chart, col_intel = st.columns([3, 2])
 
