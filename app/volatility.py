@@ -1,41 +1,28 @@
 """
-volatility.py — Country-level volatility engine (institutional upgrade)
+volatility.py — Country-specific volatility engine (final production version)
 """
 
-import numpy as np
-from live_data import fetch_vix
+from live_data import (
+    fetch_vix,
+    fetch_country_bond_vol,
+    fetch_country_fx_vol,
+    fetch_country_equity_vol
+)
 
-# ── MOCK / INITIAL (upgrade later with APIs) ─────────────────────
-
-def _bond_vol(country):
-    # Placeholder (later: FRED yields std dev)
-    return np.random.uniform(10, 25)
-
-def _fx_vol(country):
-    # Placeholder (later: FX volatility)
-    return np.random.uniform(5, 20)
-
-def _equity_vol(country):
-    # Placeholder (later: index volatility)
-    return np.random.uniform(10, 30)
-
-
-# ── MAIN FUNCTION ───────────────────────────────────────────────
 
 def get_country_volatility(country: str) -> float:
     """
-    Composite volatility score (0–100)
+    Composite volatility score using real + country-specific data
     """
 
     try:
-        vix = fetch_vix()
-        vix = float(vix) if vix else 20.0
-    except:
-        vix = 20.0
+        vix   = float(fetch_vix())
+        bond  = float(fetch_country_bond_vol(country))
+        fx    = float(fetch_country_fx_vol(country))
+        eq    = float(fetch_country_equity_vol(country))
 
-    bond = _bond_vol(country)
-    fx   = _fx_vol(country)
-    eq   = _equity_vol(country)
+    except Exception:
+        return 20.0
 
     score = (
         0.4 * vix +
