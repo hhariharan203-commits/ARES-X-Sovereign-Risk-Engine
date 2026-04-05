@@ -8,6 +8,9 @@ import numpy as np
 from data_api import get_country_series, load_dataset
 from utils import trend_direction, regime_label, momentum_score
 
+# 🔥 ADD THIS (LIVE VIX)
+from live_data import fetch_vix
+
 
 # ── Signal extraction ─────────────────────────────────────────────────────────
 
@@ -37,7 +40,18 @@ def _extract_signals(series: pd.DataFrame) -> dict:
     interest     = _val("interest_rate")
     exports      = _val("exports")
     imports      = _val("imports")
-    vix          = _val("vix")
+
+    # 🔥 FIX START (VIX LIVE OVERRIDE)
+    vix = _val("vix")  # fallback (CSV)
+
+    try:
+        live_vix = fetch_vix()
+        if live_vix is not None:
+            vix = float(live_vix)
+    except Exception:
+        pass
+    # 🔥 FIX END
+
     sentiment    = _val("sentiment_mean")
 
     trade_balance = exports - imports
@@ -149,7 +163,6 @@ def _actions(sig: dict) -> list:
 
     actions = []
 
-    # Growth-related action
     if gdp > 3.0:
         actions.append("Overweight cyclical equities and credit; growth momentum supports risk asset outperformance.")
     elif gdp > 1.5:
@@ -159,7 +172,6 @@ def _actions(sig: dict) -> list:
     else:
         actions.append("Consider selective value opportunities while maintaining sufficient liquidity buffer for volatility.")
 
-    # Inflation/rate action
     if inflation > 5.0 and rate < inflation:
         actions.append("Negative real rates favor inflation-linked bonds (TIPS/linkers) and hard asset allocation.")
     elif inflation < 2.5 and sig["rate_trend"] == "Falling":
@@ -167,7 +179,6 @@ def _actions(sig: dict) -> list:
     else:
         actions.append("Maintain moderate duration; inflation-rate equilibrium limits extreme positioning on the yield curve.")
 
-    # Risk/trade action
     if vix > 28:
         actions.append("Hedge tail risk via options overlays; reduce gross exposure until volatility regime normalizes.")
     elif tb < -5:
@@ -183,7 +194,6 @@ def _actions(sig: dict) -> list:
 # ── Main interface ─────────────────────────────────────────────────────────────
 
 def generate_country_intelligence(country: str) -> dict:
-    """Generate full executive intelligence for a single country."""
     df     = load_dataset()
     series = get_country_series(df, country)
 
@@ -235,7 +245,6 @@ def generate_country_intelligence(country: str) -> dict:
 
 
 def generate_global_intelligence(top_n: int = 5) -> dict:
-    """Generate a global macro intelligence summary."""
     from forecast import forecast_all
 
     forecasts = forecast_all()
@@ -247,7 +256,14 @@ def generate_global_intelligence(top_n: int = 5) -> dict:
     top_down  = forecasts.nsmallest(top_n, "predicted_gdp")["country"].tolist()
 
     df        = load_dataset()
-    global_vix = float(df["vix"].dropna().iloc[-1]) if "vix" in df.columns else 20.0
+
+    # 🔥 FIX GLOBAL VIX
+    try:
+        live_vix = fetch_vix()
+        global_vix = float(live_vix) if live_vix is not None else float(df["vix"].dropna().iloc[-1])
+    except Exception:
+        global_vix = float(df["vix"].dropna().iloc[-1])
+
     avg_inf   = float(df["inflation"].dropna().mean()) if "inflation" in df.columns else 3.0
 
     if avg_gdp > 3.0 and avg_inf < 4.0:
