@@ -156,3 +156,56 @@ def fetch_country_equity_vol(country):
 
 def fetch_interest_rate():
     return fetch_fred_latest("FEDFUNDS")
+
+# ─────────────────────────────────────
+# CDS SPREAD (CREDIT RISK)
+# ─────────────────────────────────────
+
+def fetch_cds_proxy(country):
+    """
+    CDS is not available directly → we proxy using bond yield spread
+    """
+    try:
+        # US 10Y baseline
+        us_yield = fetch_fred_latest("DGS10") or 3.5
+
+        # Country yield (if available)
+        country_series = COUNTRY_FRED_MAP.get(country, {}).get("bond")
+
+        if country_series:
+            data = fetch_fred_series(country_series, limit=5)
+            if data:
+                country_yield = data[-1]
+            else:
+                country_yield = us_yield
+        else:
+            country_yield = us_yield
+
+        spread = max(0, country_yield - us_yield)
+
+        return float(spread * 8)  # scale
+
+    except:
+        return 5.0
+
+# ─────────────────────────────────────
+# YIELD CURVE (RECESSION SIGNAL)
+# ─────────────────────────────────────
+
+def fetch_yield_curve_signal():
+    try:
+        long = fetch_fred_latest("DGS10") or 3.5
+        short = fetch_fred_latest("DGS2") or 3.0
+
+        slope = long - short
+
+        # Inversion risk
+        if slope < 0:
+            return 25.0
+        elif slope < 1:
+            return 15.0
+        else:
+            return 5.0
+
+    except:
+        return 10.0
