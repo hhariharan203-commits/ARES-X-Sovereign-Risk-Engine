@@ -7,6 +7,18 @@ import numpy as np
 from data_api import load_dataset, load_model, load_feature_cols, get_latest, get_country_series
 from utils import safe_mean
 
+# 🔥 ADD: LIVE DATA IMPORT
+from live_data import fetch_gdp, fetch_inflation, fetch_vix
+
+# 🔥 ADD: COUNTRY CODE MAP
+COUNTRY_MAP = {
+    "India": "IND",
+    "United States": "USA",
+    "Germany": "DEU",
+    "China": "CHN",
+    "Japan": "JPN"
+}
+
 
 def _build_features(row: pd.Series, feature_cols: list) -> pd.DataFrame:
     data = {}
@@ -45,6 +57,25 @@ def forecast_country(country: str) -> dict:
         return {}
 
     latest = series.iloc[-2]
+
+    # 🔥 ADD: LIVE DATA OVERRIDE (SAFE)
+    country_code = COUNTRY_MAP.get(country, "IND")
+
+    live_gdp = fetch_gdp(country_code)
+    live_inflation = fetch_inflation(country_code)
+    live_vix = fetch_vix()
+    print("LIVE VIX:", live_vix, "| CSV VIX:",
+    latest.get("vix"))
+
+    if live_gdp is not None:
+        latest["gdp_growth"] = live_gdp
+
+    if live_inflation is not None:
+        latest["inflation"] = live_inflation
+
+    if live_vix is not None:
+        latest["vix"] = live_vix
+
     X = _build_features(latest, feature_cols)
     
     print(country, X.iloc[0][:5])
@@ -70,6 +101,8 @@ def forecast_country(country: str) -> dict:
         "delta":         round(delta, 3),
         "confidence":    confidence,
         "rmse":          round(rmse, 4),
+        "vix":
+    float(latest.get("vix", 0))    
     }
 
 
