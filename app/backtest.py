@@ -13,6 +13,10 @@ def backtest_country(country):
     actuals = []
     preds = []
 
+    # 🔥 ADDED: strategy tracking
+    strategy_returns = []
+    benchmark_returns = []
+
     for i in range(3, len(series)):
         row = series.iloc[i-1]
 
@@ -25,6 +29,15 @@ def backtest_country(country):
 
         actuals.append(actual)
         preds.append(pred)
+
+        # 🔥 ADDED: strategy logic
+        if pred > 0:
+            strategy_returns.append(actual)
+        else:
+            strategy_returns.append(0)
+
+        # 🔥 ADDED: benchmark (always exposed)
+        benchmark_returns.append(actual)
 
     if not actuals:
         return None
@@ -39,9 +52,15 @@ def backtest_country(country):
         np.sign(actuals) == np.sign(preds)
     ) * 100
 
+    # 🔥 ADDED: performance metrics
+    strategy_return = np.sum(strategy_returns)
+    benchmark_return = np.sum(benchmark_returns)
+
     return {
         "country": country,
         "rmse": round(rmse, 3),
         "mae": round(mae, 3),
-        "direction_accuracy": round(direction_acc, 1)
+        "direction_accuracy": round(direction_acc, 1),
+        "strategy_return": round(strategy_return, 2),
+        "benchmark_return": round(benchmark_return, 2),
     }
