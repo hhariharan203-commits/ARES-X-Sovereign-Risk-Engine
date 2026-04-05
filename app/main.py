@@ -867,7 +867,7 @@ elif page == "📊 Backtesting":
     result = backtest_country(country)
 
     if result:
-        c1, c2, c3 = st.columns(3)
+        c1, c2, c3, c4, c5 = st.columns(5)
 
         with c1:
             kpi_card("RMSE", str(result["rmse"]), "Lower is better")
@@ -877,6 +877,14 @@ elif page == "📊 Backtesting":
 
         with c3:
             kpi_card("Direction Accuracy", f"{result['direction_accuracy']}%", "Prediction correctness")
+
+        # 🔥 ADDED
+        with c4:
+            kpi_card("Strategy Return", f"{result['strategy_return']}%", "Model-driven")
+
+        # 🔥 ADDED
+        with c5:
+            kpi_card("Benchmark Return", f"{result['benchmark_return']}%", "Baseline")
 
     else:
         st.warning("Not enough data for backtesting")
