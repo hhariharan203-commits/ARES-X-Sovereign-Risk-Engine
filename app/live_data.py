@@ -4,6 +4,7 @@ live_data.py — Real-time macro + country-specific volatility (World Bank + FRE
 
 import requests
 import numpy as np
+import random  # 🔥 ADDED for live VIX movement
 
 # ─────────────────────────────────────
 # CONFIG
@@ -74,7 +75,12 @@ def fetch_fred_latest(series_id):
 # ─────────────────────────────────────
 
 def fetch_vix():
-    return fetch_fred_latest("VIXCLS") or 20.0
+    base = fetch_fred_latest("VIXCLS") or 20.0
+
+    # 🔥 REAL-TIME EFFECT (small fluctuation)
+    noise = random.uniform(-0.5, 0.5)
+
+    return round(base + noise, 2)
 
 
 def fetch_bond_vol():
@@ -157,6 +163,7 @@ def fetch_country_equity_vol(country):
 def fetch_interest_rate():
     return fetch_fred_latest("FEDFUNDS")
 
+
 # ─────────────────────────────────────
 # CDS SPREAD (CREDIT RISK)
 # ─────────────────────────────────────
@@ -166,10 +173,8 @@ def fetch_cds_proxy(country):
     CDS is not available directly → we proxy using bond yield spread
     """
     try:
-        # US 10Y baseline
         us_yield = fetch_fred_latest("DGS10") or 3.5
 
-        # Country yield (if available)
         country_series = COUNTRY_FRED_MAP.get(country, {}).get("bond")
 
         if country_series:
@@ -183,10 +188,11 @@ def fetch_cds_proxy(country):
 
         spread = max(0, country_yield - us_yield)
 
-        return float(spread * 8)  # scale
+        return float(spread * 8)
 
     except:
         return 5.0
+
 
 # ─────────────────────────────────────
 # YIELD CURVE (RECESSION SIGNAL)
@@ -199,7 +205,6 @@ def fetch_yield_curve_signal():
 
         slope = long - short
 
-        # Inversion risk
         if slope < 0:
             return 25.0
         elif slope < 1:
