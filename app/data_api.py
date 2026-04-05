@@ -16,7 +16,7 @@ FEATURES_PATH = BASE / "models" / "feature_cols.json"
 METRICS_PATH = BASE / "outputs" / "model_metrics.json"
 
 
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=600)
 def load_dataset() -> pd.DataFrame:
     df = pd.read_csv(DATA_PATH, parse_dates=["month"])
     df = df.sort_values(["country", "month"]).reset_index(drop=True)
