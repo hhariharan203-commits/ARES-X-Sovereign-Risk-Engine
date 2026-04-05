@@ -1,7 +1,11 @@
 import pandas as pd
 import numpy as np
 from data_api import load_dataset, get_country_series
-from forecast import forecast_country
+
+# 🔥 ADDED (fix for real backtesting)
+from forecast import _build_features
+from data_api import load_model, load_feature_cols
+
 
 def backtest_country(country):
     df = load_dataset()
@@ -17,11 +21,17 @@ def backtest_country(country):
     strategy_returns = []
     benchmark_returns = []
 
+    # 🔥 ADDED: load model once
+    model = load_model()
+    feature_cols = load_feature_cols()
+
     for i in range(3, len(series)):
         row = series.iloc[i-1]
 
         try:
-            pred = forecast_country(country)["predicted_gdp"]
+            # 🔥 FIXED: historical prediction (NOT static)
+            X = _build_features(row, feature_cols)
+            pred = float(model.predict(X)[0])
         except:
             continue
 
