@@ -39,6 +39,7 @@ from decision_terminal import make_decision, bulk_decisions
 from report import generate_country_report, generate_global_report, generate_pdf_report
 from utils import fmt_pct, fmt_signed, regime_label, regime_color, risk_color, decision_color
 from volatility import get_country_volatility
+from backtest import backtest_country
 
 inject_css()
 
@@ -58,6 +59,7 @@ PAGES = [
     "🎯  Decision Terminal",
     "🔬  Explainability",
     "📋  Reports",
+    "📊 Backtesting",
 ]
 
 st.sidebar.markdown('<div class="section-header">Navigation</div>', unsafe_allow_html=True)
@@ -853,3 +855,28 @@ elif page == "📋  Reports":
             "Reports include: executive summary, GDP forecast, risk assessment, "
             "portfolio allocation, and investment decision with rationale.",
         )
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE 13 — BACKTESTING
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📊 Backtesting":
+    page_header("Model Backtesting", "Validate prediction performance")
+
+    country = st.selectbox("Select Country", countries)
+
+    result = backtest_country(country)
+
+    if result:
+        c1, c2, c3 = st.columns(3)
+
+        with c1:
+            kpi_card("RMSE", str(result["rmse"]), "Lower is better")
+
+        with c2:
+            kpi_card("MAE", str(result["mae"]), "Error magnitude")
+
+        with c3:
+            kpi_card("Direction Accuracy", f"{result['direction_accuracy']}%", "Prediction correctness")
+
+    else:
+        st.warning("Not enough data for backtesting")
