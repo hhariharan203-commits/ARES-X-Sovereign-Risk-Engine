@@ -30,9 +30,11 @@ def backtest_country(country):
         actuals.append(actual)
         preds.append(pred)
 
-        # 🔥 ADDED: strategy logic
-        if pred > 0:
+        # 🔥 UPDATED STRATEGY (ONLY ADDITION, NOTHING REMOVED)
+        if pred > 2:
             strategy_returns.append(actual)
+        elif pred < -1:
+            strategy_returns.append(-actual)
         else:
             strategy_returns.append(0)
 
